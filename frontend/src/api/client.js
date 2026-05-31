@@ -3,11 +3,16 @@ import { fetchAuthSession } from 'aws-amplify/auth';
 import { config } from '../config';
 import {
   mockPollUploadStatus,
+  mockQueryBySpecies,
+  mockQueryByTags,
+  mockQueryByUploadedFile,
   mockRequestPresignedUrl,
+  mockResolveOriginalUrl,
   mockUploadFileToS3
 } from './mock';
 
 const awsClient = axios.create({ baseURL: config.awsApiBaseUrl });
+const gcpClient = axios.create({ baseURL: config.gcpApiBaseUrl || config.awsApiBaseUrl });
 
 const getToken = async () => {
   const session = await fetchAuthSession();
@@ -23,6 +28,7 @@ const attachAuth = async (request) => {
 };
 
 awsClient.interceptors.request.use(attachAuth);
+gcpClient.interceptors.request.use(attachAuth);
 
 const ensureBaseUrl = (baseUrl, provider) => {
   if (!baseUrl) {
@@ -68,6 +74,14 @@ export const normalizeResults = (payload) => {
   });
 };
 
+export const tagsArrayToObject = (rows) =>
+  rows.reduce((acc, row) => {
+    if (row?.species) {
+      acc[row.species] = Number(row.count || 1);
+    }
+    return acc;
+  }, {});
+
 export async function requestPresignedUrl(file) {
   if (config.useMocks) {
     return mockRequestPresignedUrl(file);
@@ -111,4 +125,44 @@ export async function pollUploadStatus({ key, file }) {
     }
   });
   return data?.item || data?.file || data;
+}
+
+export async function queryByTags(tags) {
+  if (config.useMocks) {
+    return normalizeResults(await mockQueryByTags(tags));
+  }
+  ensureBaseUrl(config.gcpApiBaseUrl || config.awsApiBaseUrl, 'GCP');
+  const { data } = await gcpClient.post(config.paths.queryByTags, { tags });
+  return normalizeResults(data);
+}
+
+export async function queryBySpecies(species) {
+  if (config.useMocks) {
+    return normalizeResults(await mockQueryBySpecies(species));
+  }
+  ensureBaseUrl(config.gcpApiBaseUrl || config.awsApiBaseUrl, 'GCP');
+  const { data } = await gcpClient.post(config.paths.queryBySpecies, { species });
+  return normalizeResults(data);
+}
+
+export async function resolveOriginalUrl(thumbnailUrl) {
+  if (config.useMocks) {
+    return mockResolveOriginalUrl(thumbnailUrl);
+  }
+  ensureBaseUrl(config.awsApiBaseUrl, 'AWS');
+  const { data } = await awsClient.post(config.paths.thumbnailLookup, { thumbnail_url: thumbnailUrl });
+  return data.original_url || data.originalUrl || data.fullUrl || data.url;
+}
+
+export async function queryByUploadedFile(file) {
+  if (config.useMocks) {
+    return normalizeResults(await mockQueryByUploadedFile(file));
+  }
+  ensureBaseUrl(config.awsApiBaseUrl, 'AWS');
+  const formData = new FormData();
+  formData.append('file', file);
+  const { data } = await awsClient.post(config.paths.queryByFile, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  });
+  return normalizeResults(data);
 }
