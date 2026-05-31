@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.DS_Store
+__MACOSX/
+
+# Large model artifacts from the ML handout are kept local and should not be
+# committed to the frontend repository.
+*.pt
+AussieEcoLense/
+
