@@ -2,6 +2,9 @@ import axios from 'axios';
 import { fetchAuthSession } from 'aws-amplify/auth';
 import { config } from '../config';
 import {
+  mockBulkUpdateTags,
+  mockDeleteFiles,
+  mockListFiles,
   mockPollUploadStatus,
   mockQueryBySpecies,
   mockQueryByTags,
@@ -164,5 +167,36 @@ export async function queryByUploadedFile(file) {
   const { data } = await awsClient.post(config.paths.queryByFile, formData, {
     headers: { 'Content-Type': 'multipart/form-data' }
   });
+  return normalizeResults(data);
+}
+
+export async function bulkUpdateTags({ urls, tags, operation }) {
+  if (config.useMocks) {
+    return mockBulkUpdateTags({ urls, tags, operation });
+  }
+  ensureBaseUrl(config.awsApiBaseUrl, 'AWS');
+  const { data } = await awsClient.post(config.paths.tagEdit, {
+    urls,
+    tags,
+    operation
+  });
+  return data;
+}
+
+export async function deleteFiles(urls) {
+  if (config.useMocks) {
+    return mockDeleteFiles(urls);
+  }
+  ensureBaseUrl(config.awsApiBaseUrl, 'AWS');
+  const { data } = await awsClient.post(config.paths.deleteFiles, { urls });
+  return data;
+}
+
+export async function listFiles() {
+  if (config.useMocks) {
+    return normalizeResults(await mockListFiles());
+  }
+  ensureBaseUrl(config.awsApiBaseUrl, 'AWS');
+  const { data } = await awsClient.get(config.paths.listFiles);
   return normalizeResults(data);
 }

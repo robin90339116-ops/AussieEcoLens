@@ -89,3 +89,35 @@ export async function mockQueryByUploadedFile() {
   await wait();
   return files.filter((file) => file.tags?.['common wombat'] || file.tags?.dingo);
 }
+
+export async function mockBulkUpdateTags({ urls, tags, operation }) {
+  await wait();
+  files = files.map((file) => {
+    const fileUrl = file.thumbnail_url || file.original_url || file.url;
+    if (!urls.includes(fileUrl)) {
+      return file;
+    }
+    const nextTags = { ...(file.tags || {}) };
+    Object.entries(tags).forEach(([species, count]) => {
+      if (operation === 1) {
+        nextTags[species] = Number(count || 1);
+      } else {
+        delete nextTags[species];
+      }
+    });
+    return { ...file, tags: nextTags };
+  });
+  return { updated: urls.length };
+}
+
+export async function mockDeleteFiles(urls) {
+  await wait();
+  const before = files.length;
+  files = files.filter((file) => !urls.includes(file.thumbnail_url || file.original_url || file.url));
+  return { deleted: before - files.length };
+}
+
+export async function mockListFiles() {
+  await wait();
+  return files;
+}
