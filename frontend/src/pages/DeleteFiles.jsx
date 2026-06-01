@@ -1,7 +1,7 @@
 import { Button, Empty, Form, Input, Modal, Space, Table, Tag, Typography, message } from 'antd';
 import { RefreshCw, Trash2 } from 'lucide-react';
 import { useMemo, useState } from 'react';
-import { deleteFiles, listFiles } from '../api/client';
+import { deleteFiles, getErrorMessage, listFiles } from '../api/client';
 
 const parseLines = (value = '') =>
   value
@@ -34,7 +34,7 @@ export default function DeleteFiles() {
       );
       setSelectedKeys([]);
     } catch (error) {
-      message.error(error.message || 'Could not load files');
+      message.error(getErrorMessage(error, 'Could not load files'));
     } finally {
       setLoading(false);
     }
@@ -62,7 +62,7 @@ export default function DeleteFiles() {
       setSelectedKeys([]);
       setConfirmOpen(false);
     } catch (error) {
-      message.error(error.message || 'Delete failed');
+      message.error(getErrorMessage(error, 'Delete failed'));
     } finally {
       setLoading(false);
     }
@@ -152,4 +152,3 @@ export default function DeleteFiles() {
     </section>
   );
 }
-

@@ -1,6 +1,7 @@
 import { Button, Form, Input, Space, Typography, message } from 'antd';
 import { ShieldCheck } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
+import { getErrorMessage } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 
 export default function Signup() {
@@ -12,7 +13,7 @@ export default function Signup() {
       await register(values);
       navigate('/verify', { state: { email: values.email } });
     } catch (error) {
-      message.error(error.message || 'Sign-up failed');
+      message.error(getErrorMessage(error, 'Sign-up failed'));
     }
   };
 
@@ -78,4 +79,3 @@ export default function Signup() {
     </main>
   );
 }
-

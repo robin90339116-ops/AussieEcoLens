@@ -1,7 +1,12 @@
 import { Button, Checkbox, Empty, Space, Tag, Typography, message } from 'antd';
 import { Bell, Save, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { getSubscriptions, saveSubscriptions, unsubscribeSpecies } from '../api/client';
+import {
+  getErrorMessage,
+  getSubscriptions,
+  saveSubscriptions,
+  unsubscribeSpecies
+} from '../api/client';
 import { speciesOptions } from '../data/species';
 import { useAuth } from '../context/AuthContext';
 
@@ -15,7 +20,7 @@ export default function Subscribe() {
     try {
       setSelected(await getSubscriptions());
     } catch (error) {
-      message.error(error.message || 'Could not load subscriptions');
+      message.error(getErrorMessage(error, 'Could not load subscriptions'));
     } finally {
       setLoading(false);
     }
@@ -34,7 +39,7 @@ export default function Subscribe() {
       }
       message.success('Subscriptions updated');
     } catch (error) {
-      message.error(error.message || 'Subscription update failed');
+      message.error(getErrorMessage(error, 'Subscription update failed'));
     } finally {
       setLoading(false);
     }
@@ -47,7 +52,7 @@ export default function Subscribe() {
       setSelected(Array.isArray(next) ? next : selected.filter((item) => item !== species));
       message.success('Subscription removed');
     } catch (error) {
-      message.error(error.message || 'Unsubscribe failed');
+      message.error(getErrorMessage(error, 'Unsubscribe failed'));
     } finally {
       setLoading(false);
     }

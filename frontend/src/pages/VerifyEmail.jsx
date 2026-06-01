@@ -1,6 +1,7 @@
 import { Button, Form, Input, Space, Typography, message } from 'antd';
 import { CheckCircle2, RefreshCw } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { getErrorMessage } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 
 export default function VerifyEmail() {
@@ -15,7 +16,7 @@ export default function VerifyEmail() {
       message.success('Email verified');
       navigate('/login');
     } catch (error) {
-      message.error(error.message || 'Verification failed');
+      message.error(getErrorMessage(error, 'Verification failed'));
     }
   };
 
@@ -24,7 +25,7 @@ export default function VerifyEmail() {
       await resendCode(email);
       message.success('Verification code sent');
     } catch (error) {
-      message.error(error.message || 'Could not resend code');
+      message.error(getErrorMessage(error, 'Could not resend code'));
     }
   };
 
@@ -75,4 +76,3 @@ export default function VerifyEmail() {
     </main>
   );
 }
-

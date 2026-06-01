@@ -12,7 +12,13 @@ import {
 import { FileSearch, Plus, Search, UploadCloud, X } from 'lucide-react';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { queryBySpecies, queryByTags, queryByUploadedFile, tagsArrayToObject } from '../api/client';
+import {
+  getErrorMessage,
+  queryBySpecies,
+  queryByTags,
+  queryByUploadedFile,
+  tagsArrayToObject
+} from '../api/client';
 import { speciesOptions } from '../data/species';
 
 export default function SearchPage() {
@@ -36,7 +42,7 @@ export default function SearchPage() {
       const items = await queryByTags(tags);
       goToResults('Tag count query', items);
     } catch (error) {
-      message.error(error.message || 'Query failed');
+      message.error(getErrorMessage(error, 'Query failed'));
     } finally {
       setLoading(false);
     }
@@ -48,7 +54,7 @@ export default function SearchPage() {
       const items = await queryBySpecies(species);
       goToResults('Species query', items);
     } catch (error) {
-      message.error(error.message || 'Query failed');
+      message.error(getErrorMessage(error, 'Query failed'));
     } finally {
       setLoading(false);
     }
@@ -64,7 +70,7 @@ export default function SearchPage() {
       const items = await queryByUploadedFile(queryFile);
       goToResults('Uploaded file query', items);
     } catch (error) {
-      message.error(error.message || 'Query failed');
+      message.error(getErrorMessage(error, 'Query failed'));
     } finally {
       setLoading(false);
     }
@@ -196,4 +202,3 @@ export default function SearchPage() {
     </section>
   );
 }
-

@@ -1,6 +1,7 @@
 import { Alert, Button, Form, Input, Space, Typography, message } from 'antd';
 import { LogIn, UserPlus } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { getErrorMessage } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 
 export default function Login() {
@@ -24,7 +25,7 @@ export default function Login() {
       }
       navigate(redirectTo, { replace: true });
     } catch (error) {
-      message.error(error.message || 'Sign-in failed');
+      message.error(getErrorMessage(error, 'Sign-in failed'));
     }
   };
 
@@ -80,4 +81,3 @@ export default function Login() {
     </main>
   );
 }
-

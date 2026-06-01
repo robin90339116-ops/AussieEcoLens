@@ -2,7 +2,7 @@ import { Button, Empty, Image, Modal, Space, Tag, Typography, message } from 'an
 import { ExternalLink, Eye, PlayCircle } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useLocation } from 'react-router-dom';
-import { resolveOriginalUrl } from '../api/client';
+import { getErrorMessage, resolveOriginalUrl } from '../api/client';
 
 const readStoredResults = () => {
   try {
@@ -33,7 +33,7 @@ export default function Results() {
       const originalUrl = await resolveOriginalUrl(thumbnailUrl);
       setModalUrl(originalUrl);
     } catch (error) {
-      message.error(error.message || 'Could not resolve original URL');
+      message.error(getErrorMessage(error, 'Could not resolve original URL'));
     } finally {
       setLoadingUrl('');
     }
@@ -119,4 +119,3 @@ export default function Results() {
     </section>
   );
 }
-

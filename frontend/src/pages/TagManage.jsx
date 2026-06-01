@@ -1,7 +1,7 @@
 import { Button, Form, Input, InputNumber, Radio, Select, Space, Typography, message } from 'antd';
 import { Plus, Save, X } from 'lucide-react';
 import { useState } from 'react';
-import { bulkUpdateTags, tagsArrayToObject } from '../api/client';
+import { bulkUpdateTags, getErrorMessage, tagsArrayToObject } from '../api/client';
 import { speciesOptions } from '../data/species';
 
 const parseLines = (value = '') =>
@@ -30,7 +30,7 @@ export default function TagManage() {
       });
       message.success(`Tag update submitted${response?.updated ? `: ${response.updated}` : ''}`);
     } catch (error) {
-      message.error(error.message || 'Tag update failed');
+      message.error(getErrorMessage(error, 'Tag update failed'));
     } finally {
       setLoading(false);
     }
@@ -108,4 +108,3 @@ export default function TagManage() {
     </section>
   );
 }
-

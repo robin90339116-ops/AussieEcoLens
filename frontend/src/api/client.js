@@ -20,8 +20,8 @@ import {
 const awsClient = axios.create({ baseURL: config.awsApiBaseUrl });
 const gcpClient = axios.create({ baseURL: config.gcpApiBaseUrl || config.awsApiBaseUrl });
 
-const getToken = async () => {
-  const session = await fetchAuthSession();
+const getToken = async (forceRefresh = false) => {
+  const session = await fetchAuthSession({ forceRefresh });
   return session.tokens?.accessToken?.toString() || session.tokens?.idToken?.toString() || '';
 };
 
@@ -36,10 +36,48 @@ const attachAuth = async (request) => {
 awsClient.interceptors.request.use(attachAuth);
 gcpClient.interceptors.request.use(attachAuth);
 
+const retryWithFreshToken = async (error) => {
+  const originalRequest = error.config;
+
+  if (error.response?.status !== 401 || !originalRequest || originalRequest._authRetry) {
+    return Promise.reject(error);
+  }
+
+  originalRequest._authRetry = true;
+  const token = await getToken(true);
+  if (token) {
+    originalRequest.headers = originalRequest.headers || {};
+    originalRequest.headers.Authorization = `Bearer ${token}`;
+  }
+  return axios(originalRequest);
+};
+
+awsClient.interceptors.response.use((response) => response, retryWithFreshToken);
+gcpClient.interceptors.response.use((response) => response, retryWithFreshToken);
+
 const ensureBaseUrl = (baseUrl, provider) => {
   if (!baseUrl) {
     throw new Error(`${provider} API base URL is missing. Set it in frontend/.env.`);
   }
+};
+
+export const getErrorMessage = (error, fallback = 'Request failed') => {
+  if (typeof error === 'string') {
+    return error;
+  }
+
+  const data = error?.response?.data;
+  if (typeof data === 'string') {
+    return data;
+  }
+
+  return (
+    data?.message ||
+    data?.error ||
+    data?.detail ||
+    error?.message ||
+    fallback
+  );
 };
 
 export const normalizeResults = (payload) => {
@@ -230,4 +268,3 @@ export async function unsubscribeSpecies(species) {
   const { data } = await awsClient.delete(config.paths.subscriptions, { data: { species } });
   return data;
 }
-

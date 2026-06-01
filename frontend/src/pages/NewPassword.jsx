@@ -1,6 +1,7 @@
 import { Button, Form, Input, Typography, message } from 'antd';
 import { ShieldCheck } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { getErrorMessage } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 
 export default function NewPassword() {
@@ -13,7 +14,7 @@ export default function NewPassword() {
       message.success('Password updated');
       navigate('/upload', { replace: true });
     } catch (error) {
-      message.error(error.message || 'Password update failed');
+      message.error(getErrorMessage(error, 'Password update failed'));
     }
   };
 
@@ -52,4 +53,3 @@ export default function NewPassword() {
     </main>
   );
 }
-

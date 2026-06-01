@@ -2,6 +2,7 @@ import { Button, Descriptions, Progress, Space, Steps, Tag, Typography, Upload, 
 import { Image as ImageIcon, UploadCloud } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import {
+  getErrorMessage,
   normalizeResults,
   pollUploadStatus,
   requestPresignedUrl,
@@ -90,7 +91,7 @@ export default function UploadPage() {
       setStatus('complete');
       message.success('Upload complete');
     } catch (uploadError) {
-      setError(uploadError.message || 'Upload failed');
+      setError(getErrorMessage(uploadError, 'Upload failed'));
       setStatus('idle');
     }
   };
@@ -185,4 +186,3 @@ export default function UploadPage() {
     </section>
   );
 }
-
