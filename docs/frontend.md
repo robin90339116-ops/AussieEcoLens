@@ -51,3 +51,16 @@ npm run build
 ```
 
 The production artifact is generated in `frontend/dist`, ready for S3 plus CloudFront or Amplify Hosting.
+
+## Deployment
+
+For S3 plus CloudFront hosting, export the deployment bucket and optional distribution ID:
+
+```bash
+cd frontend
+export VITE_DEPLOY_BUCKET=aussie-ecolens-frontend
+export VITE_CLOUDFRONT_DISTRIBUTION_ID=EXAMPLE123
+npm run deploy:s3
+```
+
+The deploy script builds the Vite app, syncs `dist/` to S3, and invalidates CloudFront when a distribution ID is supplied.
