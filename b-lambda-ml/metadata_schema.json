@@ -1,0 +1,93 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Aussie EcoLens Media Metadata",
+  "type": "object",
+  "required": [
+    "status",
+    "file_id",
+    "file_type",
+    "original_bucket",
+    "original_key",
+    "original_url",
+    "tags",
+    "predictions",
+    "created_at"
+  ],
+  "properties": {
+    "status": {
+      "type": "string",
+      "enum": ["ok"]
+    },
+    "file_id": {
+      "type": "string",
+      "description": "Stable SHA-256 identifier based on checksum or bucket/key."
+    },
+    "file_type": {
+      "type": "string",
+      "enum": ["image", "video"]
+    },
+    "original_bucket": {
+      "type": "string"
+    },
+    "original_key": {
+      "type": "string"
+    },
+    "original_url": {
+      "type": "string"
+    },
+    "thumbnail_url": {
+      "type": ["string", "null"],
+      "description": "Present for images. Null for videos unless a video preview is generated."
+    },
+    "checksum": {
+      "type": ["string", "null"]
+    },
+    "tags": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "integer",
+        "minimum": 1
+      },
+      "description": "Common species name mapped to count."
+    },
+    "predictions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["scientific_name", "common_name", "confidence", "source"],
+        "properties": {
+          "scientific_name": {
+            "type": "string"
+          },
+          "common_name": {
+            "type": "string"
+          },
+          "confidence": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "source": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "detections": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "frames_processed": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "persisted": {
+      "type": "boolean"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "additionalProperties": true
+}

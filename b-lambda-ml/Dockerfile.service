@@ -1,0 +1,36 @@
+# ML inference HTTP service for Oracle Cloud (OCI) compute deployment (Route B).
+FROM python:3.12-slim
+
+ENV PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1
+
+WORKDIR /app
+
+# libGL is avoided by using opencv-python-headless; libglib2 is still needed by some wheels.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        libglib2.0-0 \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY requirements-lambda.txt requirements-service.txt ./
+
+# CPU-only torch to keep the image small, then ML deps, then web service deps.
+RUN python -m pip install --upgrade pip && \
+    python -m pip install torch==2.12.0 torchvision==0.27.0 \
+        --index-url https://download.pytorch.org/whl/cpu && \
+    python -m pip install -r requirements-lambda.txt && \
+    python -m pip uninstall -y opencv-python || true && \
+    python -m pip install --force-reinstall --no-deps opencv-python-headless==4.13.0.92 && \
+    python -m pip install -r requirements-service.txt
+
+COPY ecolens_core.py ml_service.py labels.txt mdv5a.pt model.pt ./
+
+ENV MD_MODEL_PATH=/app/mdv5a.pt \
+    SPECIES_MODEL_PATH=/app/model.pt \
+    LABELS_PATH=/app/labels.txt \
+    PRELOAD_MODELS=true
+
+EXPOSE 8080
+
+# Single worker keeps one copy of the models in memory. Scale with more containers,
+# not more workers, because each worker would load the full model set.
+CMD ["uvicorn", "ml_service:app", "--host", "0.0.0.0", "--port", "8080", "--workers", "1"]

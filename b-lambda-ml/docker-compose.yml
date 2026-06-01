@@ -1,0 +1,24 @@
+services:
+  ml-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.service
+    image: aussie-ecolens-ml-service:latest
+    container_name: aussie-ecolens-ml
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      # Shared secret / passed-through Cognito token expected on /v1/* requests.
+      API_AUTH_TOKEN: ${API_AUTH_TOKEN:-change-me}
+      PRELOAD_MODELS: "true"
+      # Optional: forward metadata to the D module's database API after inference.
+      METADATA_API_URL: ${METADATA_API_URL:-}
+      THUMBNAIL_BUCKET: ${THUMBNAIL_BUCKET:-}
+      THUMBNAIL_PREFIX: ${THUMBNAIL_PREFIX:-thumbnails/}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8080/health').status==200 else 1)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
