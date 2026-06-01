@@ -4,6 +4,7 @@ import { config } from '../config';
 import {
   mockBulkUpdateTags,
   mockDeleteFiles,
+  mockGetSubscriptions,
   mockListFiles,
   mockPollUploadStatus,
   mockQueryBySpecies,
@@ -11,6 +12,8 @@ import {
   mockQueryByUploadedFile,
   mockRequestPresignedUrl,
   mockResolveOriginalUrl,
+  mockSaveSubscriptions,
+  mockUnsubscribeSpecies,
   mockUploadFileToS3
 } from './mock';
 
@@ -200,3 +203,31 @@ export async function listFiles() {
   const { data } = await awsClient.get(config.paths.listFiles);
   return normalizeResults(data);
 }
+
+export async function getSubscriptions() {
+  if (config.useMocks) {
+    return mockGetSubscriptions();
+  }
+  ensureBaseUrl(config.awsApiBaseUrl, 'AWS');
+  const { data } = await awsClient.get(config.paths.subscriptions);
+  return data.species || data.subscriptions || data.items || [];
+}
+
+export async function saveSubscriptions(speciesList) {
+  if (config.useMocks) {
+    return mockSaveSubscriptions(speciesList);
+  }
+  ensureBaseUrl(config.awsApiBaseUrl, 'AWS');
+  const { data } = await awsClient.post(config.paths.subscriptions, { species: speciesList });
+  return data;
+}
+
+export async function unsubscribeSpecies(species) {
+  if (config.useMocks) {
+    return mockUnsubscribeSpecies(species);
+  }
+  ensureBaseUrl(config.awsApiBaseUrl, 'AWS');
+  const { data } = await awsClient.delete(config.paths.subscriptions, { data: { species } });
+  return data;
+}
+

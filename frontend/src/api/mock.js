@@ -30,6 +30,7 @@ const sampleFiles = [
 ];
 
 let files = [...sampleFiles];
+let subscriptions = ['common wombat'];
 
 const wait = (ms = 360) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -121,3 +122,21 @@ export async function mockListFiles() {
   await wait();
   return files;
 }
+
+export async function mockGetSubscriptions() {
+  await wait();
+  return subscriptions;
+}
+
+export async function mockSaveSubscriptions(speciesList) {
+  await wait();
+  subscriptions = [...new Set(speciesList)];
+  return subscriptions;
+}
+
+export async function mockUnsubscribeSpecies(species) {
+  await wait();
+  subscriptions = subscriptions.filter((item) => item !== species);
+  return subscriptions;
+}
+
