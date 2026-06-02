@@ -51,12 +51,32 @@ aws cognito-idp admin-confirm-sign-up \
 ### 3.3 Enable password-based login (CLI testing only)
 > SPA clients do not enable USER_PASSWORD_AUTH by default. This is enabled here for command-line testing;
 > the frontend uses SRP / Hosted UI and is not affected.
+>
+> IMPORTANT: `update-user-pool-client` REPLACES the whole config. Any field you omit gets reset to empty.
+> So always pass OAuth flows / scopes / callback URLs together with the auth flows, or they will be wiped.
 ```bash
 aws cognito-idp update-user-pool-client \
   --user-pool-id us-east-1_lb6SisPnD \
   --client-id fvmq1uralbq80r9q7nrnonh73 \
-  --explicit-auth-flows ALLOW_USER_PASSWORD_AUTH ALLOW_REFRESH_TOKEN_AUTH ALLOW_USER_SRP_AUTH
+  --explicit-auth-flows ALLOW_USER_PASSWORD_AUTH ALLOW_USER_SRP_AUTH ALLOW_REFRESH_TOKEN_AUTH \
+  --supported-identity-providers COGNITO \
+  --callback-urls 'http://localhost:3000/' \
+  --logout-urls 'http://localhost:3000/' \
+  --allowed-o-auth-flows code \
+  --allowed-o-auth-scopes openid email phone \
+  --allowed-o-auth-flows-user-pool-client
 ```
+
+### Current App Client config (verified 2026-06-03)
+
+| Field | Value |
+|-------|-------|
+| Client secret | none |
+| Auth flows | ALLOW_USER_PASSWORD_AUTH, ALLOW_USER_SRP_AUTH, ALLOW_REFRESH_TOKEN_AUTH |
+| OAuth flows | code |
+| OAuth scopes | openid, email, phone |
+| Callback URLs | http://localhost:3000/ |
+| Logout URLs | http://localhost:3000/ |
 
 ### 3.4 Log in to obtain a JWT
 ```bash
