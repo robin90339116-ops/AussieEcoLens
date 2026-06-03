@@ -61,6 +61,23 @@ const ensureBaseUrl = (baseUrl, provider) => {
   }
 };
 
+const unwrapResponsePayload = (payload) => {
+  if (typeof payload?.body === 'string') {
+    try {
+      return JSON.parse(payload.body);
+    } catch {
+      return payload;
+    }
+  }
+  return payload?.body && typeof payload.body === 'object' ? payload.body : payload;
+};
+
+const hashFile = async (file) => {
+  const buffer = await file.arrayBuffer();
+  const digest = await crypto.subtle.digest('SHA-256', buffer);
+  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
+};
+
 export const getErrorMessage = (error, fallback = 'Request failed') => {
   if (typeof error === 'string') {
     return error;
@@ -70,22 +87,31 @@ export const getErrorMessage = (error, fallback = 'Request failed') => {
   if (typeof data === 'string') {
     return data;
   }
+  const payload = unwrapResponsePayload(data);
 
   return (
-    data?.message ||
-    data?.error ||
-    data?.detail ||
+    payload?.message ||
+    payload?.error ||
+    payload?.detail ||
     error?.message ||
     fallback
   );
 };
 
-export const normalizeResults = (payload) => {
+export const normalizeResults = (responsePayload) => {
+  const payload = unwrapResponsePayload(responsePayload);
+  const singleMetadata =
+    payload &&
+    !Array.isArray(payload) &&
+    payload.status !== 'error' &&
+    (payload.file_id || payload.fileId || payload.original_url || payload.thumbnail_url || payload.tags || payload.predictions);
+
   const rawItems =
     payload?.items ||
     payload?.results ||
     payload?.files ||
     payload?.matches ||
+    (singleMetadata ? [payload] : null) ||
     (Array.isArray(payload) ? payload : []);
 
   return rawItems.map((item, index) => {
@@ -104,7 +130,10 @@ export const normalizeResults = (payload) => {
       item.thumbnail_url || item.thumbnailUrl || item.thumbnail || item.previewUrl || item.url;
     const originalUrl =
       item.original_url || item.originalUrl || item.fullUrl || item.mediaUrl || item.url || thumbnailUrl;
-    const type = item.type || (/\.(mp4|mov|webm)$/i.test(originalUrl || '') ? 'video' : 'image');
+    const type =
+      item.type ||
+      item.file_type ||
+      (/\.(mp4|mov|webm)$/i.test(originalUrl || '') ? 'video' : 'image');
 
     return {
       ...item,
@@ -116,6 +145,24 @@ export const normalizeResults = (payload) => {
       tags: item.tags || item.detectedTags || {}
     };
   });
+};
+
+const checkDuplicateFile = async (file, fileHash) => {
+  if (!config.paths.checkDuplicate) {
+    return null;
+  }
+
+  try {
+    const { data } = await awsClient.post(config.paths.checkDuplicate, {
+      file_hash: fileHash
+    });
+    return unwrapResponsePayload(data);
+  } catch (error) {
+    if (error.response?.status === 409) {
+      return unwrapResponsePayload(error.response.data);
+    }
+    throw error;
+  }
 };
 
 export const tagsArrayToObject = (rows) =>
@@ -131,14 +178,51 @@ export async function requestPresignedUrl(file) {
     return mockRequestPresignedUrl(file);
   }
   ensureBaseUrl(config.awsApiBaseUrl, 'AWS');
-  const { data } = await awsClient.get(config.paths.presigned, {
-    params: {
-      fileName: file.name,
-      contentType: file.type,
-      size: file.size
-    }
+
+  const fileHash = await hashFile(file);
+  const duplicate = await checkDuplicateFile(file, fileHash);
+  if (duplicate?.duplicate) {
+    const existingFile = duplicate.existing_file || duplicate.existingFile;
+    return {
+      ...duplicate,
+      duplicate: true,
+      original_url: existingFile,
+      url: existingFile,
+      tags: {}
+    };
+  }
+
+  const { data } = await awsClient.post(config.paths.presigned, {
+    action: 'PUT',
+    filename: file.name,
+    content_type: file.type || 'application/octet-stream',
+    file_hash: fileHash
   });
-  return data;
+  const payload = unwrapResponsePayload(data);
+  return {
+    ...payload,
+    uploadUrl:
+      payload.uploadUrl ||
+      payload.upload_url ||
+      payload.presignedUrl ||
+      payload.presigned_url ||
+      payload.url,
+    key: payload.key || payload.file_key || payload.objectKey,
+    fileHash
+  };
+}
+
+export async function requestDownloadUrl(s3UrlOrKey) {
+  if (config.useMocks) {
+    return s3UrlOrKey;
+  }
+  ensureBaseUrl(config.awsApiBaseUrl, 'AWS');
+  const { data } = await awsClient.post(config.paths.presigned, {
+    action: 'GET',
+    s3_url: s3UrlOrKey
+  });
+  const payload = unwrapResponsePayload(data);
+  return payload.presigned_url || payload.presignedUrl || payload.url;
 }
 
 export async function uploadFileToS3(uploadUrl, file, onProgress) {
@@ -161,6 +245,14 @@ export async function pollUploadStatus({ key, file }) {
   if (config.useMocks) {
     return mockPollUploadStatus(file);
   }
+  if (!config.paths.uploadStatus) {
+    return {
+      id: key || file.name,
+      type: file.type,
+      original_url: key || file.name,
+      tags: {}
+    };
+  }
   ensureBaseUrl(config.awsApiBaseUrl, 'AWS');
   const { data } = await awsClient.get(config.paths.uploadStatus, {
     params: {
@@ -168,7 +260,8 @@ export async function pollUploadStatus({ key, file }) {
       fileName: file.name
     }
   });
-  return data?.item || data?.file || data;
+  const payload = unwrapResponsePayload(data);
+  return payload?.item || payload?.file || payload;
 }
 
 export async function queryByTags(tags) {
@@ -195,7 +288,8 @@ export async function resolveOriginalUrl(thumbnailUrl) {
   }
   ensureBaseUrl(config.awsApiBaseUrl, 'AWS');
   const { data } = await awsClient.post(config.paths.thumbnailLookup, { thumbnail_url: thumbnailUrl });
-  return data.original_url || data.originalUrl || data.fullUrl || data.url;
+  const payload = unwrapResponsePayload(data);
+  return payload.original_url || payload.originalUrl || payload.fullUrl || payload.presigned_url || payload.url;
 }
 
 export async function queryByUploadedFile(file) {
@@ -221,7 +315,7 @@ export async function bulkUpdateTags({ urls, tags, operation }) {
     tags,
     operation
   });
-  return data;
+  return unwrapResponsePayload(data);
 }
 
 export async function deleteFiles(urls) {
@@ -230,7 +324,7 @@ export async function deleteFiles(urls) {
   }
   ensureBaseUrl(config.awsApiBaseUrl, 'AWS');
   const { data } = await awsClient.post(config.paths.deleteFiles, { urls });
-  return data;
+  return unwrapResponsePayload(data);
 }
 
 export async function listFiles() {
@@ -248,7 +342,8 @@ export async function getSubscriptions() {
   }
   ensureBaseUrl(config.awsApiBaseUrl, 'AWS');
   const { data } = await awsClient.get(config.paths.subscriptions);
-  return data.species || data.subscriptions || data.items || [];
+  const payload = unwrapResponsePayload(data);
+  return payload.species || payload.subscriptions || payload.items || [];
 }
 
 export async function saveSubscriptions(speciesList) {
@@ -257,7 +352,7 @@ export async function saveSubscriptions(speciesList) {
   }
   ensureBaseUrl(config.awsApiBaseUrl, 'AWS');
   const { data } = await awsClient.post(config.paths.subscriptions, { species: speciesList });
-  return data;
+  return unwrapResponsePayload(data);
 }
 
 export async function unsubscribeSpecies(species) {
@@ -266,5 +361,5 @@ export async function unsubscribeSpecies(species) {
   }
   ensureBaseUrl(config.awsApiBaseUrl, 'AWS');
   const { data } = await awsClient.delete(config.paths.subscriptions, { data: { species } });
-  return data;
+  return unwrapResponsePayload(data);
 }

@@ -1,5 +1,5 @@
-import { Button, Empty, Image, Modal, Space, Tag, Typography, message } from 'antd';
-import { ExternalLink, Eye, PlayCircle } from 'lucide-react';
+import { Button, Empty, Image as AntImage, Modal, Space, Tag, Typography, message } from 'antd';
+import { ExternalLink, Eye, Image as ImageIcon, PlayCircle } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { getErrorMessage, resolveOriginalUrl } from '../api/client';
@@ -28,6 +28,10 @@ export default function Results() {
 
   const handleOpenImage = async (item) => {
     const thumbnailUrl = item.thumbnail_url || item.url || item.original_url;
+    if (!thumbnailUrl) {
+      message.error('No preview URL is available for this result');
+      return;
+    }
     setLoadingUrl(thumbnailUrl);
     try {
       const originalUrl = await resolveOriginalUrl(thumbnailUrl);
@@ -66,7 +70,14 @@ export default function Results() {
                       <Typography.Text>Video file</Typography.Text>
                     </div>
                   ) : (
-                    <Image src={previewUrl} alt="Wildlife thumbnail" preview={false} />
+                    previewUrl ? (
+                      <AntImage src={previewUrl} alt="Wildlife thumbnail" preview={false} />
+                    ) : (
+                      <div className="video-tile">
+                        <ImageIcon size={42} />
+                        <Typography.Text>Detected tags</Typography.Text>
+                      </div>
+                    )
                   )}
                 </div>
                 <div className="media-card-body">
@@ -78,7 +89,7 @@ export default function Results() {
                     ))}
                   </Space>
                   <Space className="card-actions">
-                    {isVideo ? (
+                    {isVideo && originalUrl ? (
                       <Button
                         href={originalUrl}
                         target="_blank"
@@ -87,7 +98,7 @@ export default function Results() {
                       >
                         Open
                       </Button>
-                    ) : (
+                    ) : !isVideo && previewUrl ? (
                       <Button
                         loading={loadingUrl === previewUrl}
                         icon={<Eye size={16} />}
@@ -95,9 +106,11 @@ export default function Results() {
                       >
                         Full image
                       </Button>
+                    ) : (
+                      <Typography.Text type="secondary">No media URL</Typography.Text>
                     )}
                     <Typography.Text copyable ellipsis className="copy-url">
-                      {previewUrl}
+                      {previewUrl || item.original_key || item.file_id || 'No media URL'}
                     </Typography.Text>
                   </Space>
                 </div>

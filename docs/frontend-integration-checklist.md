@@ -6,26 +6,67 @@ Use this checklist before the final demo. It is not report text; it is a practic
 
 | Variable | Owner | Purpose |
 | --- | --- | --- |
-| `VITE_AWS_REGION` | A | Cognito and API region |
-| `VITE_COGNITO_USER_POOL_ID` | A | Cognito User Pool used by Amplify Auth |
-| `VITE_COGNITO_CLIENT_ID` | A | Cognito App Client ID |
-| `VITE_AWS_API_BASE_URL` | A/D | API Gateway root for AWS-side endpoints |
-| `VITE_GCP_API_BASE_URL` | D | GCP Cloud Functions root for Q1/Q2 |
+| `VITE_AWS_REGION=us-east-1` | A | Cognito and API Gateway region from Ruitong's setup |
+| `VITE_COGNITO_USER_POOL_ID=us-east-1_lb6SisPnD` | A | Cognito User Pool used by Amplify Auth |
+| `VITE_COGNITO_CLIENT_ID=fvmq1uralbq80r9q7nrnonh73` | A | Public SPA App Client ID; no client secret |
+| `VITE_AWS_API_BASE_URL` | A | API Gateway invoke URL for `66h13afw3g`; deployment stage still needs confirmation |
+| `VITE_GCP_API_BASE_URL` | D | Optional separate GCP Cloud Functions root for Q1/Q2; leave empty if API Gateway routes them |
 | `VITE_USE_MOCKS=false` | C | Must be false for real integration and demo |
+
+## API Gateway Paths From A
+
+Ruitong's 2026-06-03 package confirms the API Gateway resource tree, but also states that methods are not created yet. The frontend path defaults now match these resources:
+
+| Feature | Frontend variable | Confirmed path |
+| --- | --- | --- |
+| Presigned upload | `VITE_PRESIGNED_PATH` | `/upload/presigned` |
+| Duplicate check | `VITE_UPLOAD_CHECK_DUP_PATH` | `/upload/check-dup` |
+| Q1 tag-count query | `VITE_Q1_PATH` | `/query/by-tags` |
+| Q2 species query | `VITE_Q2_PATH` | `/query/by-species` |
+| Q3 thumbnail lookup | `VITE_Q3_PATH` | `/query/by-thumbnail` |
+| Q4 uploaded-file query | `VITE_Q4_PATH` | `/query/by-file` |
+| Q5 tag edit | `VITE_Q5_PATH` | `/tags/modify` |
+| Q6 file delete/list | `VITE_Q6_PATH`, `VITE_LIST_FILES_PATH` | `/files` |
+| Subscriptions | `VITE_SUBSCRIPTIONS_PATH` | `/notifications/subscribe` |
+
+## Upload Interface From A
+
+Ruitong's branch adds Lambda code for presigned upload and duplicate checking:
+
+- `POST /upload/check-dup` sends `{ "file_hash": "<sha256>" }`.
+- Duplicate response uses HTTP `409` with `{ "duplicate": true, "message": "...", "existing_file": "<url>" }`.
+- Non-duplicate response uses HTTP `200` with `{ "duplicate": false }`.
+- `POST /upload/presigned` sends `{ "action": "PUT", "filename": "...", "content_type": "...", "file_hash": "..." }`.
+- Presigned upload response is `{ "upload_url": "...", "file_key": "...", "bucket": "aussie-ecolens-35346906" }`.
+- The same presigned Lambda can generate read URLs with `{ "action": "GET", "s3_url": "..." }` or `{ "action": "GET", "file_key": "..." }`, returning `{ "presigned_url": "..." }`.
+- The frontend computes SHA-256 in the browser before requesting the upload URL, then uploads the file to S3 using `PUT`.
+- Ruitong's S3 CORS config currently allows `http://localhost:3000`, so the Vite dev server is configured to use port `3000` for local integration.
+
+## ML Interface From B
+
+Wenxuan's branch confirms the B module metadata shape. The frontend now accepts both lists of files and a single metadata object:
+
+- Stored upload/ML metadata includes `file_id`, `file_type`, `original_url`, `thumbnail_url`, `tags`, `predictions`, and `created_at`.
+- Tags are common species names mapped to counts, for example `{ "dingo": 1 }`.
+- The direct query-by-file ML service endpoint is `POST /v1/tag/upload` with multipart field `file`; it returns detected `tags` and `predictions` without permanently storing the query image.
+- The API Gateway `/query/by-file` route should either return matched stored files from D, or return this B metadata object so the UI can show detected tags.
 
 ## Backend Contract Checks
 
-Confirm these request and response shapes with A and D before demo:
+Confirm these methods, request bodies, and response shapes with A and D before demo:
 
-- Presigned upload: frontend sends `fileName`, `contentType`, and `size`; response must include `uploadUrl`, `url`, or `presignedUrl`.
-- Upload status: confirm whether `/files/status` exists. If not, replace `VITE_UPLOAD_STATUS_PATH` or adjust `pollUploadStatus`.
+- API Gateway deployment: confirm the stage and full invoke URL for API ID `66h13afw3g`, for example `https://66h13afw3g.execute-api.us-east-1.amazonaws.com/<stage>`.
+- Presigned upload: A's Lambda currently expects `POST` with `filename`, `content_type`, and optional `file_hash`; response includes `upload_url`, `file_key`, and `bucket`.
+- Duplicate check: A's Lambda currently expects `POST /upload/check-dup` with `file_hash`; confirm the API Gateway method is wired to this Lambda.
+- Upload status/result: Ruitong's resource tree has no status endpoint yet. If A adds one, set `VITE_UPLOAD_STATUS_PATH`; otherwise the frontend completes upload with basic file metadata.
 - Q1 tag count query: confirm whether backend expects `{ tags: { species: count } }` or the raw `{ species: count }` object.
 - Q2 species query: confirm whether backend expects `{ species: "dingo" }`, query params, or a path parameter.
 - Q3 thumbnail lookup: confirm request body key is `thumbnail_url` and response includes `original_url`, `originalUrl`, `fullUrl`, or `url`.
-- Q4 uploaded-file query: confirm multipart field name is `file` and the uploaded query image is not permanently stored.
+- Q4 uploaded-file query: confirm multipart field name is `file`. Wenxuan's B endpoint returns detected tags without storing the file; confirm whether D then returns matched stored files or the gateway returns only the B metadata.
 - Q5 bulk tag edit: confirm request body is `{ urls, tags, operation }` with `operation` as `1` for add and `0` for remove.
-- Q6 delete files: confirm request body is `{ urls }` and backend deletes storage objects and database records.
-- Subscriptions: confirm request body for save is `{ species: [...] }`, and cancel supports DELETE with `{ species }`.
+- Q6 delete files: frontend currently posts `{ urls }` to `/files`; confirm whether A implements this as `POST /files`, `DELETE /files`, or another method.
+- File listing: frontend currently reads `GET /files`; confirm the response returns `items`, `results`, `files`, or an array.
+- Subscriptions: frontend uses `GET`, `POST { species: [...] }`, and `DELETE { species }` against `/notifications/subscribe`; confirm methods and body keys.
 
 ## Demo Smoke Test
 
@@ -42,4 +83,3 @@ Confirm these request and response shapes with A and D before demo:
 11. Add and remove a tag for multiple URLs.
 12. Delete a file and confirm it disappears from the UI.
 13. Subscribe and unsubscribe from one species.
-
