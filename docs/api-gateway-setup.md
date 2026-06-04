@@ -1,7 +1,7 @@
 # Aussie EcoLens — API Gateway Setup
 
 Owner: Ruitong Yang (ryan0099)
-Last updated: 2026-06-03
+Last updated: 2026-06-04
 
 > Built in account ryan0099 (983018774467), region us-east-1.
 
@@ -43,3 +43,20 @@ Last updated: 2026-06-03
 > ```
 > aws apigateway get-resources --rest-api-id 66h13afw3g --region us-east-1 --query 'items[*].[path,id]' --output text
 > ```
+
+---
+
+## 3. upload/presigned endpoint (updated 2026-06-04)
+
+The "Methods: none yet" line in Section 1 is outdated: the POST method on /upload/presigned is now live, integrated with EcoLens-Presigned (Lambda Proxy), protected by the Cognito authorizer, CORS configured, deployed to prod.
+
+Invoke URL:
+https://66h13afw3g.execute-api.us-east-1.amazonaws.com/prod/upload/presigned
+
+How to call (frontend):
+- Header: Authorization: Bearer <IdToken from login>
+- Body: {"filename": "xxx.jpg", "content_type": "image/jpeg"}
+- Returns: upload_url, file_key, bucket
+- PUT the file directly to upload_url to upload to S3
+
+Tested: without token returns 401, with token returns 200 with the upload URL. Working.
