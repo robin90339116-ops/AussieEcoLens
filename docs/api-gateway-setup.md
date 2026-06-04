@@ -60,3 +60,17 @@ How to call (frontend):
 - PUT the file directly to upload_url to upload to S3
 
 Tested: without token returns 401, with token returns 200 with the upload URL. Working.
+
+## 4. upload/check-dup endpoint (updated 2026-06-04)
+
+POST method on /upload/check-dup is live: integrated with EcoLens-Dedup, Cognito auth, CORS configured, deployed to prod.
+
+Invoke URL:
+https://66h13afw3g.execute-api.us-east-1.amazonaws.com/prod/upload/check-dup
+
+How to call (frontend):
+- Header: Authorization: Bearer <IdToken>
+- Body: {"file_hash": "<md5 of file>"}
+- Returns: {"duplicate": false} or 409 with existing_file if already uploaded
+
+Tested: without token 401, with token 200 {"duplicate": false}. Working.
