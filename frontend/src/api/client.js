@@ -19,10 +19,11 @@ import {
 
 const awsClient = axios.create({ baseURL: config.awsApiBaseUrl });
 const gcpClient = axios.create({ baseURL: config.gcpApiBaseUrl || config.awsApiBaseUrl });
+const mlClient = axios.create({ baseURL: config.mlApiBaseUrl });
 
 const getToken = async (forceRefresh = false) => {
   const session = await fetchAuthSession({ forceRefresh });
-  return session.tokens?.accessToken?.toString() || session.tokens?.idToken?.toString() || '';
+  return session.tokens?.idToken?.toString() || session.tokens?.accessToken?.toString() || '';
 };
 
 const attachAuth = async (request) => {
@@ -35,6 +36,9 @@ const attachAuth = async (request) => {
 
 awsClient.interceptors.request.use(attachAuth);
 gcpClient.interceptors.request.use(attachAuth);
+if (config.mlApiRequiresAuth) {
+  mlClient.interceptors.request.use(attachAuth);
+}
 
 const retryWithFreshToken = async (error) => {
   const originalRequest = error.config;
@@ -54,6 +58,9 @@ const retryWithFreshToken = async (error) => {
 
 awsClient.interceptors.response.use((response) => response, retryWithFreshToken);
 gcpClient.interceptors.response.use((response) => response, retryWithFreshToken);
+if (config.mlApiRequiresAuth) {
+  mlClient.interceptors.response.use((response) => response, retryWithFreshToken);
+}
 
 const ensureBaseUrl = (baseUrl, provider) => {
   if (!baseUrl) {
@@ -61,21 +68,111 @@ const ensureBaseUrl = (baseUrl, provider) => {
   }
 };
 
+const hasResultShape = (payload) =>
+  Boolean(
+    payload &&
+      (Array.isArray(payload) ||
+        payload.items ||
+        payload.results ||
+        payload.files ||
+        payload.matches ||
+        payload.file_id ||
+        payload.fileId ||
+        payload.original_url ||
+        payload.thumbnail_url ||
+        payload.tags ||
+        payload.predictions)
+  );
+
 const unwrapResponsePayload = (payload) => {
   if (typeof payload?.body === 'string') {
     try {
-      return JSON.parse(payload.body);
+      const parsed = JSON.parse(payload.body);
+      return !hasResultShape(parsed) && hasResultShape(parsed?.data) ? parsed.data : parsed;
     } catch {
       return payload;
     }
   }
-  return payload?.body && typeof payload.body === 'object' ? payload.body : payload;
+  const unwrapped = payload?.body && typeof payload.body === 'object' ? payload.body : payload;
+  return !hasResultShape(unwrapped) && hasResultShape(unwrapped?.data) ? unwrapped.data : unwrapped;
+};
+
+const md5Hex = (buffer) => {
+  const bytes = new Uint8Array(buffer);
+  const words = [];
+  const shifts = [7, 12, 17, 22, 5, 9, 14, 20, 4, 11, 16, 23, 6, 10, 15, 21];
+  const constants = Array.from({ length: 64 }, (_, index) =>
+    Math.floor(Math.abs(Math.sin(index + 1)) * 0x100000000) >>> 0
+  );
+  const add = (left, right) => (left + right) >>> 0;
+  const rotate = (value, shift) => (value << shift) | (value >>> (32 - shift));
+
+  bytes.forEach((byte, index) => {
+    words[index >> 2] = (words[index >> 2] || 0) | (byte << ((index % 4) * 8));
+  });
+
+  words[bytes.length >> 2] =
+    (words[bytes.length >> 2] || 0) | (0x80 << ((bytes.length % 4) * 8));
+  const lengthIndex = (((bytes.length + 8) >> 6) + 1) * 16;
+  const bitLength = bytes.length * 8;
+  words[lengthIndex - 2] = bitLength >>> 0;
+  words[lengthIndex - 1] = Math.floor(bitLength / 0x100000000);
+
+  let a = 0x67452301;
+  let b = 0xefcdab89;
+  let c = 0x98badcfe;
+  let d = 0x10325476;
+
+  for (let offset = 0; offset < words.length; offset += 16) {
+    let aa = a;
+    let bb = b;
+    let cc = c;
+    let dd = d;
+
+    for (let index = 0; index < 64; index += 1) {
+      let fn;
+      let wordIndex;
+      if (index < 16) {
+        fn = (b & c) | (~b & d);
+        wordIndex = index;
+      } else if (index < 32) {
+        fn = (d & b) | (~d & c);
+        wordIndex = (5 * index + 1) % 16;
+      } else if (index < 48) {
+        fn = b ^ c ^ d;
+        wordIndex = (3 * index + 5) % 16;
+      } else {
+        fn = c ^ (b | ~d);
+        wordIndex = (7 * index) % 16;
+      }
+
+      const previousD = d;
+      d = c;
+      c = b;
+      const shift = shifts[Math.floor(index / 16) * 4 + (index % 4)];
+      b = add(
+        b,
+        rotate(add(add(a, fn >>> 0), add(constants[index], words[offset + wordIndex] || 0)), shift)
+      );
+      a = previousD;
+    }
+
+    a = add(a, aa);
+    b = add(b, bb);
+    c = add(c, cc);
+    d = add(d, dd);
+  }
+
+  return [a, b, c, d]
+    .map((word) =>
+      [0, 8, 16, 24].map((shift) => ((word >>> shift) & 0xff).toString(16).padStart(2, '0')).join('')
+    )
+    .join('');
 };
 
 const hashFile = async (file) => {
   const buffer = await file.arrayBuffer();
-  const digest = await crypto.subtle.digest('SHA-256', buffer);
-  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
+  return md5Hex(buffer);
 };
 
 export const getErrorMessage = (error, fallback = 'Request failed') => {
@@ -296,12 +393,18 @@ export async function queryByUploadedFile(file) {
   if (config.useMocks) {
     return normalizeResults(await mockQueryByUploadedFile(file));
   }
-  ensureBaseUrl(config.awsApiBaseUrl, 'AWS');
+
   const formData = new FormData();
   formData.append('file', file);
-  const { data } = await awsClient.post(config.paths.queryByFile, formData, {
-    headers: { 'Content-Type': 'multipart/form-data' }
-  });
+
+  if (config.mlApiBaseUrl) {
+    ensureBaseUrl(config.mlApiBaseUrl, 'ML');
+    const { data } = await mlClient.post(config.paths.mlUpload, formData);
+    return normalizeResults(data);
+  }
+
+  ensureBaseUrl(config.awsApiBaseUrl, 'AWS');
+  const { data } = await awsClient.post(config.paths.queryByFile, formData);
   return normalizeResults(data);
 }
 

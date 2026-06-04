@@ -9,8 +9,10 @@ Use this checklist before the final demo. It is not report text; it is a practic
 | `VITE_AWS_REGION=us-east-1` | A | Cognito and API Gateway region from Ruitong's setup |
 | `VITE_COGNITO_USER_POOL_ID=us-east-1_lb6SisPnD` | A | Cognito User Pool used by Amplify Auth |
 | `VITE_COGNITO_CLIENT_ID=fvmq1uralbq80r9q7nrnonh73` | A | Public SPA App Client ID; no client secret |
-| `VITE_AWS_API_BASE_URL` | A | API Gateway invoke URL for `66h13afw3g`; deployment stage still needs confirmation |
+| `VITE_AWS_API_BASE_URL=https://66h13afw3g.execute-api.us-east-1.amazonaws.com/prod` | A | API Gateway prod invoke URL for live upload endpoints |
 | `VITE_GCP_API_BASE_URL` | D | Optional separate GCP Cloud Functions root for Q1/Q2; leave empty if API Gateway routes them |
+| `VITE_ML_API_BASE_URL` | B | Optional direct root for Wenxuan's ML upload-tagging service |
+| `VITE_ML_UPLOAD_PATH=/v1/tag/upload` | B | Direct ML route for Q4 when API Gateway does not proxy `/query/by-file` |
 | `VITE_USE_MOCKS=false` | C | Must be false for real integration and demo |
 
 ## API Gateway Paths From A
@@ -33,13 +35,13 @@ Ruitong's 2026-06-03 package confirms the API Gateway resource tree, but also st
 
 Ruitong's branch adds Lambda code for presigned upload and duplicate checking:
 
-- `POST /upload/check-dup` sends `{ "file_hash": "<sha256>" }`.
+- `POST /upload/check-dup` is live on prod and sends `{ "file_hash": "<md5>" }`.
 - Duplicate response uses HTTP `409` with `{ "duplicate": true, "message": "...", "existing_file": "<url>" }`.
 - Non-duplicate response uses HTTP `200` with `{ "duplicate": false }`.
-- `POST /upload/presigned` sends `{ "action": "PUT", "filename": "...", "content_type": "...", "file_hash": "..." }`.
+- `POST /upload/presigned` is live on prod and sends `{ "action": "PUT", "filename": "...", "content_type": "...", "file_hash": "..." }`.
 - Presigned upload response is `{ "upload_url": "...", "file_key": "...", "bucket": "aussie-ecolens-35346906" }`.
 - The same presigned Lambda can generate read URLs with `{ "action": "GET", "s3_url": "..." }` or `{ "action": "GET", "file_key": "..." }`, returning `{ "presigned_url": "..." }`.
-- The frontend computes SHA-256 in the browser before requesting the upload URL, then uploads the file to S3 using `PUT`.
+- The frontend computes MD5 in the browser before requesting the upload URL, then uploads the file to S3 using `PUT`.
 - Ruitong's S3 CORS config currently allows `http://localhost:3000`, so the Vite dev server is configured to use port `3000` for local integration.
 
 ## ML Interface From B
@@ -50,19 +52,20 @@ Wenxuan's branch confirms the B module metadata shape. The frontend now accepts 
 - Tags are common species names mapped to counts, for example `{ "dingo": 1 }`.
 - The direct query-by-file ML service endpoint is `POST /v1/tag/upload` with multipart field `file`; it returns detected `tags` and `predictions` without permanently storing the query image.
 - The API Gateway `/query/by-file` route should either return matched stored files from D, or return this B metadata object so the UI can show detected tags.
+- The frontend now supports both options: if `VITE_ML_API_BASE_URL` is set, Q4 posts directly to B; otherwise Q4 posts to API Gateway `/query/by-file`.
 
 ## Backend Contract Checks
 
 Confirm these methods, request bodies, and response shapes with A and D before demo:
 
-- API Gateway deployment: confirm the stage and full invoke URL for API ID `66h13afw3g`, for example `https://66h13afw3g.execute-api.us-east-1.amazonaws.com/<stage>`.
+- API Gateway deployment: upload endpoints are confirmed on the prod stage; confirm whether the remaining query/tag/delete/notification methods are also deployed there.
 - Presigned upload: A's Lambda currently expects `POST` with `filename`, `content_type`, and optional `file_hash`; response includes `upload_url`, `file_key`, and `bucket`.
-- Duplicate check: A's Lambda currently expects `POST /upload/check-dup` with `file_hash`; confirm the API Gateway method is wired to this Lambda.
+- Duplicate check: A's Lambda currently expects `POST /upload/check-dup` with an MD5 `file_hash`.
 - Upload status/result: Ruitong's resource tree has no status endpoint yet. If A adds one, set `VITE_UPLOAD_STATUS_PATH`; otherwise the frontend completes upload with basic file metadata.
 - Q1 tag count query: confirm whether backend expects `{ tags: { species: count } }` or the raw `{ species: count }` object.
 - Q2 species query: confirm whether backend expects `{ species: "dingo" }`, query params, or a path parameter.
 - Q3 thumbnail lookup: confirm request body key is `thumbnail_url` and response includes `original_url`, `originalUrl`, `fullUrl`, or `url`.
-- Q4 uploaded-file query: confirm multipart field name is `file`. Wenxuan's B endpoint returns detected tags without storing the file; confirm whether D then returns matched stored files or the gateway returns only the B metadata.
+- Q4 uploaded-file query: confirm multipart field name is `file`. Wenxuan's B endpoint returns detected tags without storing the file; confirm whether D then returns matched stored files or the gateway returns only the B metadata. If API Gateway is not ready, set `VITE_ML_API_BASE_URL` to B's service root for direct testing.
 - Q5 bulk tag edit: confirm request body is `{ urls, tags, operation }` with `operation` as `1` for add and `0` for remove.
 - Q6 delete files: frontend currently posts `{ urls }` to `/files`; confirm whether A implements this as `POST /files`, `DELETE /files`, or another method.
 - File listing: frontend currently reads `GET /files`; confirm the response returns `items`, `results`, `files`, or an array.

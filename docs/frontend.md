@@ -30,14 +30,20 @@ npm install
 npm run dev
 ```
 
-Set `VITE_USE_MOCKS=false` when real AWS/GCP endpoints are available.
+Set `VITE_USE_MOCKS=false` when real AWS/GCP/ML endpoints are available.
 For local cloud integration, open the app at `http://localhost:3000` because
 Ruitong's S3 CORS config currently allows that origin for direct presigned uploads.
 
 The current Cognito values from A's 2026-06-03 setup are `us-east-1`, user pool
 `us-east-1_lb6SisPnD`, and app client `fvmq1uralbq80r9q7nrnonh73`. The API Gateway
-resource tree is created under API ID `66h13afw3g`, but the deployment stage and
-HTTP methods still need to be confirmed before the final demo.
+prod base URL is `https://66h13afw3g.execute-api.us-east-1.amazonaws.com/prod`;
+`/upload/presigned` and `/upload/check-dup` are live, while the remaining
+query/tag/delete/notification methods still need to be confirmed before the final demo.
+
+For Wenxuan's ML service, Q4 can run in either of two ways:
+
+- Leave `VITE_ML_API_BASE_URL` empty when `/query/by-file` is already routed through API Gateway.
+- Set `VITE_ML_API_BASE_URL` and `VITE_ML_UPLOAD_PATH=/v1/tag/upload` to call B's upload-tagging service directly.
 
 ## API Contract Notes
 
@@ -45,9 +51,11 @@ The API client accepts common response shapes used during integration:
 
 - Presigned upload responses can return `uploadUrl`, `upload_url`, `url`,
   `presignedUrl`, or `presigned_url`.
+- Duplicate upload checks send an MD5 `file_hash` to `/upload/check-dup`.
 - Result lists can be returned as `items`, `results`, `files`, or a raw array.
 - Single ML metadata records from B are also accepted, including `file_id`, `file_type`,
   `original_url`, `thumbnail_url`, `tags`, and `predictions`.
+- Q4 sends uploaded query images as `multipart/form-data` with the field name `file`, matching B's upload-tagging service.
 - Gallery records can include `thumbnail_url`, `thumbnailUrl`, `url`, `original_url`, `originalUrl`, `type`, and `tags`.
 - Q3 full-size lookup can return `original_url`, `originalUrl`, `fullUrl`, or `url`.
 
