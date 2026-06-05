@@ -24,6 +24,15 @@ This branch contains the urgent D group API work for AussieEcoLens.
   - Cognito JWT verification and CORS
 - API contract and curl examples:
   - `docs/db-and-queries.md`
+- Demo and architecture support docs:
+  - `docs/demo-checklist.md`
+  - `docs/architecture.md`
+- A API Gateway route handoff:
+  - `infra/api-gateway/d-group-openapi-fragment.yaml`
+  - `infra/api-gateway/README.md`
+- Local checks:
+  - `tests/smoke_d_group.py`
+  - `tests/test_d_group_handlers.py`
 
 ## For teammates
 
@@ -52,4 +61,13 @@ C can use the documented Q1/Q2/Q3/Q4/Q5/Q6 request and response formats to wire 
 - B's ML query Lambda name for Q4:
   - `ML_QUERY_LAMBDA_NAME`
 - Final endpoint URLs pasted back into `docs/db-and-queries.md`.
-- Final team report, individual report, and architecture figure.
+- Final team report and individual report.
+- Final architecture figure redraw with official AWS/GCP icons if required.
+
+## Local verification
+
+```bash
+/Users/whizi/process/.venv/bin/python3.14 -m compileall -q lambda gcp-functions/queries-gcp tests
+/Users/whizi/process/.venv/bin/python3.14 tests/smoke_d_group.py
+/Users/whizi/process/.venv/bin/python3.14 -m unittest tests/test_d_group_handlers.py
+```

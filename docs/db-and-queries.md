@@ -492,6 +492,9 @@ curl -X POST "$AWS_NOTIFICATION_URL" \
 8. Prefer routing Q1/Q2 through A's API Gateway. If not, give C the protected GCP HTTPS URLs and confirm Cognito JWT settings are configured.
 9. Give C the final endpoint URLs and this API contract.
 
+API Gateway route handoff for A is in `Project/infra/api-gateway/d-group-openapi-fragment.yaml`.
+Environment variable placeholders are listed in `Project/.env.example`.
+
 ## Current status
 
 Implemented now:
@@ -502,10 +505,13 @@ Implemented now:
 - D4 Q4 Lambda handler skeleton integrated with B's ML Lambda contract.
 - D5 SNS helper and notification Lambda.
 - D6.1 API documentation.
+- A API Gateway route handoff fragment.
+- Demo checklist and architecture diagram draft.
+- Local smoke test and handler unit tests.
 
 Not done by request:
 
-- D6.2 architecture diagram.
+- D6.2 final architecture diagram with official AWS/GCP icons.
 - D6.3/D6.4 team report.
 - D6.5 individual report.
 - Final cloud deployment, because real AWS/GCP credentials and A's Cognito values are needed.
