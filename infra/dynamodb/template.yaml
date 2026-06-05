@@ -1,0 +1,63 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: DynamoDB tables for AussieEcoLens D group APIs.
+
+Parameters:
+  FilesTableName:
+    Type: String
+    Default: AussieEcoLensFiles
+  NotificationsTableName:
+    Type: String
+    Default: AussieEcoLensNotificationsSub
+
+Resources:
+  FilesTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Ref FilesTableName
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: file_id
+          AttributeType: S
+        - AttributeName: checksum
+          AttributeType: S
+        - AttributeName: owner_id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: file_id
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: checksum-index
+          KeySchema:
+            - AttributeName: checksum
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+        - IndexName: owner_id-index
+          KeySchema:
+            - AttributeName: owner_id
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+
+  NotificationsSubTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Ref NotificationsTableName
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: user_email
+          AttributeType: S
+      KeySchema:
+        - AttributeName: user_email
+          KeyType: HASH
+
+Outputs:
+  FilesTableName:
+    Value: !Ref FilesTable
+  NotificationsTableName:
+    Value: !Ref NotificationsSubTable
+  ChecksumIndexName:
+    Value: checksum-index
+  OwnerIndexName:
+    Value: owner_id-index
+

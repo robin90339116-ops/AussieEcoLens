@@ -1,0 +1,10 @@
+.DS_Store
+__pycache__/
+*.pyc
+*.pt
+.pytest_cache/
+.venv/
+dist/
+build/
+.aws-sam/
+.serverless/
