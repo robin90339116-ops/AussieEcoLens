@@ -61,7 +61,7 @@ How to call (frontend):
 
 Tested: without token returns 401, with token returns 200 with the upload URL. Working.
 
-## 4. upload/check-dup endpoint (updated 2026-06-04)
+## 4. upload/check-dup endpoint (updated 2026-06-05)
 
 POST method on /upload/check-dup is live: integrated with EcoLens-Dedup, Cognito auth, CORS configured, deployed to prod.
 
@@ -70,7 +70,12 @@ https://66h13afw3g.execute-api.us-east-1.amazonaws.com/prod/upload/check-dup
 
 How to call (frontend):
 - Header: Authorization: Bearer <IdToken>
-- Body: {"file_hash": "<md5 of file>"}
-- Returns: {"duplicate": false} or 409 with existing_file if already uploaded
+- Body: {"checksum": "<sha256 of file>"}  (legacy field name "file_hash" also accepted)
+- Returns: {"duplicate": false} or 409 with {"duplicate": true, "file_id": ..., "existing_file": <original_url>}
 
-Tested: without token 401, with token 200 {"duplicate": false}. Working.
+Backend details:
+- DynamoDB table: AussieEcoLensFiles (team schema, see Module D infra/dynamodb/schema.md), queried via checksum-index
+- Table name is read from Lambda env var TABLE_NAME (currently AussieEcoLensFiles)
+- Hash algorithm is SHA-256 team-wide (frontend must NOT use MD5)
+
+Tested 2026-06-05: without token 401; with token 200 {"duplicate": false} for both "checksum" and "file_hash" field names. Working.
