@@ -1,29 +1,31 @@
-# lambda/dedup/handler.py
 import boto3
 import json
+import os
 
 dynamodb = boto3.resource('dynamodb')
-table = dynamodb.Table('EcoLensFiles')
+table = dynamodb.Table(os.environ.get('TABLE_NAME', 'AussieEcoLensFiles'))
 
 def lambda_handler(event, context):
     try:
         body = json.loads(event['body'])
-        file_hash = body['file_hash']
+        checksum = body.get('checksum') or body['file_hash']
 
         response = table.query(
-            IndexName='hash-index',
-            KeyConditionExpression='file_hash = :hash',
-            ExpressionAttributeValues={':hash': file_hash}
+            IndexName='checksum-index',
+            KeyConditionExpression='checksum = :c',
+            ExpressionAttributeValues={':c': checksum}
         )
 
         if response['Items']:
+            item = response['Items'][0]
             return {
                 'statusCode': 409,
                 'headers': {'Access-Control-Allow-Origin': '*'},
                 'body': json.dumps({
                     'duplicate': True,
                     'message': 'File already exists',
-                    'existing_file': response['Items'][0]['file_url']
+                    'file_id': item['file_id'],
+                    'existing_file': item.get('original_url', '')
                 })
             }
 
