@@ -21,7 +21,7 @@ const getTokenPayload = async () => {
 };
 
 export function AuthProvider({ children }) {
-  const mockAuth = config.useMocks || !authConfigured;
+  const mockAuth = config.useMocks;
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [pendingUsername, setPendingUsername] = useState('');
@@ -179,4 +179,3 @@ export function AuthProvider({ children }) {
 }
 
 export const useAuth = () => useContext(AuthContext);
-

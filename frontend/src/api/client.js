@@ -19,7 +19,6 @@ import {
 
 const awsClient = axios.create({ baseURL: config.awsApiBaseUrl });
 const gcpClient = axios.create({ baseURL: config.gcpApiBaseUrl || config.awsApiBaseUrl });
-const mlClient = axios.create({ baseURL: config.mlApiBaseUrl });
 
 const getToken = async (forceRefresh = false) => {
   const session = await fetchAuthSession({ forceRefresh });
@@ -36,9 +35,6 @@ const attachAuth = async (request) => {
 
 awsClient.interceptors.request.use(attachAuth);
 gcpClient.interceptors.request.use(attachAuth);
-if (config.mlApiRequiresAuth) {
-  mlClient.interceptors.request.use(attachAuth);
-}
 
 const retryWithFreshToken = async (error) => {
   const originalRequest = error.config;
@@ -58,9 +54,6 @@ const retryWithFreshToken = async (error) => {
 
 awsClient.interceptors.response.use((response) => response, retryWithFreshToken);
 gcpClient.interceptors.response.use((response) => response, retryWithFreshToken);
-if (config.mlApiRequiresAuth) {
-  mlClient.interceptors.response.use((response) => response, retryWithFreshToken);
-}
 
 const ensureBaseUrl = (baseUrl, provider) => {
   if (!baseUrl) {
@@ -97,82 +90,57 @@ const unwrapResponsePayload = (payload) => {
   return !hasResultShape(unwrapped) && hasResultShape(unwrapped?.data) ? unwrapped.data : unwrapped;
 };
 
-const md5Hex = (buffer) => {
-  const bytes = new Uint8Array(buffer);
-  const words = [];
-  const shifts = [7, 12, 17, 22, 5, 9, 14, 20, 4, 11, 16, 23, 6, 10, 15, 21];
-  const constants = Array.from({ length: 64 }, (_, index) =>
-    Math.floor(Math.abs(Math.sin(index + 1)) * 0x100000000) >>> 0
-  );
-  const add = (left, right) => (left + right) >>> 0;
-  const rotate = (value, shift) => (value << shift) | (value >>> (32 - shift));
-
-  bytes.forEach((byte, index) => {
-    words[index >> 2] = (words[index >> 2] || 0) | (byte << ((index % 4) * 8));
-  });
-
-  words[bytes.length >> 2] =
-    (words[bytes.length >> 2] || 0) | (0x80 << ((bytes.length % 4) * 8));
-  const lengthIndex = (((bytes.length + 8) >> 6) + 1) * 16;
-  const bitLength = bytes.length * 8;
-  words[lengthIndex - 2] = bitLength >>> 0;
-  words[lengthIndex - 1] = Math.floor(bitLength / 0x100000000);
-
-  let a = 0x67452301;
-  let b = 0xefcdab89;
-  let c = 0x98badcfe;
-  let d = 0x10325476;
-
-  for (let offset = 0; offset < words.length; offset += 16) {
-    let aa = a;
-    let bb = b;
-    let cc = c;
-    let dd = d;
-
-    for (let index = 0; index < 64; index += 1) {
-      let fn;
-      let wordIndex;
-      if (index < 16) {
-        fn = (b & c) | (~b & d);
-        wordIndex = index;
-      } else if (index < 32) {
-        fn = (d & b) | (~d & c);
-        wordIndex = (5 * index + 1) % 16;
-      } else if (index < 48) {
-        fn = b ^ c ^ d;
-        wordIndex = (3 * index + 5) % 16;
-      } else {
-        fn = c ^ (b | ~d);
-        wordIndex = (7 * index) % 16;
-      }
-
-      const previousD = d;
-      d = c;
-      c = b;
-      const shift = shifts[Math.floor(index / 16) * 4 + (index % 4)];
-      b = add(
-        b,
-        rotate(add(add(a, fn >>> 0), add(constants[index], words[offset + wordIndex] || 0)), shift)
-      );
-      a = previousD;
-    }
-
-    a = add(a, aa);
-    b = add(b, bb);
-    c = add(c, cc);
-    d = add(d, dd);
+const sha256Hex = async (buffer) => {
+  if (!globalThis.crypto?.subtle) {
+    throw new Error('SHA-256 hashing requires a secure browser context with Web Crypto support.');
   }
-
-  return [a, b, c, d]
-    .map((word) =>
-      [0, 8, 16, 24].map((shift) => ((word >>> shift) & 0xff).toString(16).padStart(2, '0')).join('')
-    )
+  const digest = await globalThis.crypto.subtle.digest('SHA-256', buffer);
+  return Array.from(new Uint8Array(digest))
+    .map((byte) => byte.toString(16).padStart(2, '0'))
     .join('');
 };
 
 const hashFile = async (file) => {
   const buffer = await file.arrayBuffer();
-  return md5Hex(buffer);
+  return sha256Hex(buffer);
+};
+
+const fileToBase64 = (file) =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = String(reader.result || '');
+      resolve(result.includes(',') ? result.split(',')[1] : result);
+    };
+    reader.onerror = () => reject(reader.error || new Error('Could not read file'));
+    reader.readAsDataURL(file);
+  });
+
+const subscriptionsKey = (userEmail) => `aussie-ecolens-subscriptions:${userEmail || 'current-user'}`;
+
+const readCachedSubscriptions = (userEmail) => {
+  if (typeof window === 'undefined') {
+    return [];
+  }
+  try {
+    const cached = window.localStorage.getItem(subscriptionsKey(userEmail));
+    const parsed = cached ? JSON.parse(cached) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+};
+
+const writeCachedSubscriptions = (userEmail, speciesList) => {
+  const next = [...new Set(speciesList)].filter(Boolean);
+  if (typeof window !== 'undefined') {
+    try {
+      window.localStorage.setItem(subscriptionsKey(userEmail), JSON.stringify(next));
+    } catch {
+      // UI cache is best effort; the API request above is the source of truth.
+    }
+  }
+  return next;
 };
 
 export const getErrorMessage = (error, fallback = 'Request failed') => {
@@ -251,7 +219,8 @@ const checkDuplicateFile = async (file, fileHash) => {
 
   try {
     const { data } = await awsClient.post(config.paths.checkDuplicate, {
-      file_hash: fileHash
+      file_hash: fileHash,
+      checksum: fileHash
     });
     return unwrapResponsePayload(data);
   } catch (error) {
@@ -293,7 +262,8 @@ export async function requestPresignedUrl(file) {
     action: 'PUT',
     filename: file.name,
     content_type: file.type || 'application/octet-stream',
-    file_hash: fileHash
+    file_hash: fileHash,
+    checksum: fileHash
   });
   const payload = unwrapResponsePayload(data);
   return {
@@ -366,7 +336,7 @@ export async function queryByTags(tags) {
     return normalizeResults(await mockQueryByTags(tags));
   }
   ensureBaseUrl(config.gcpApiBaseUrl || config.awsApiBaseUrl, 'GCP');
-  const { data } = await gcpClient.post(config.paths.queryByTags, { tags });
+  const { data } = await gcpClient.post(config.paths.queryByTags, { tags, limit: 50 });
   return normalizeResults(data);
 }
 
@@ -375,7 +345,7 @@ export async function queryBySpecies(species) {
     return normalizeResults(await mockQueryBySpecies(species));
   }
   ensureBaseUrl(config.gcpApiBaseUrl || config.awsApiBaseUrl, 'GCP');
-  const { data } = await gcpClient.post(config.paths.queryBySpecies, { species });
+  const { data } = await gcpClient.post(config.paths.queryBySpecies, { species, limit: 50 });
   return normalizeResults(data);
 }
 
@@ -394,17 +364,12 @@ export async function queryByUploadedFile(file) {
     return normalizeResults(await mockQueryByUploadedFile(file));
   }
 
-  const formData = new FormData();
-  formData.append('file', file);
-
-  if (config.mlApiBaseUrl) {
-    ensureBaseUrl(config.mlApiBaseUrl, 'ML');
-    const { data } = await mlClient.post(config.paths.mlUpload, formData);
-    return normalizeResults(data);
-  }
-
   ensureBaseUrl(config.awsApiBaseUrl, 'AWS');
-  const { data } = await awsClient.post(config.paths.queryByFile, formData);
+  const { data } = await awsClient.post(config.paths.queryByFile, {
+    image_base64: await fileToBase64(file),
+    content_type: file.type || 'image/jpeg',
+    limit: 50
+  });
   return normalizeResults(data);
 }
 
@@ -426,43 +391,62 @@ export async function deleteFiles(urls) {
     return mockDeleteFiles(urls);
   }
   ensureBaseUrl(config.awsApiBaseUrl, 'AWS');
-  const { data } = await awsClient.post(config.paths.deleteFiles, { urls });
-  return unwrapResponsePayload(data);
+  const results = await Promise.all(
+    urls.map(async (url) => {
+      const { data } = await awsClient.delete(config.paths.deleteFiles, {
+        data: { url }
+      });
+      return unwrapResponsePayload(data);
+    })
+  );
+  return {
+    deleted: results.length,
+    results
+  };
 }
 
 export async function listFiles() {
   if (config.useMocks) {
     return normalizeResults(await mockListFiles());
   }
+  if (!config.paths.listFiles) {
+    return [];
+  }
   ensureBaseUrl(config.awsApiBaseUrl, 'AWS');
   const { data } = await awsClient.get(config.paths.listFiles);
   return normalizeResults(data);
 }
 
-export async function getSubscriptions() {
+export async function getSubscriptions(userEmail) {
   if (config.useMocks) {
     return mockGetSubscriptions();
   }
-  ensureBaseUrl(config.awsApiBaseUrl, 'AWS');
-  const { data } = await awsClient.get(config.paths.subscriptions);
-  const payload = unwrapResponsePayload(data);
-  return payload.species || payload.subscriptions || payload.items || [];
+  return readCachedSubscriptions(userEmail);
 }
 
-export async function saveSubscriptions(speciesList) {
+export async function saveSubscriptions(speciesList, userEmail) {
   if (config.useMocks) {
     return mockSaveSubscriptions(speciesList);
   }
   ensureBaseUrl(config.awsApiBaseUrl, 'AWS');
-  const { data } = await awsClient.post(config.paths.subscriptions, { species: speciesList });
-  return unwrapResponsePayload(data);
+  await awsClient.post(config.paths.subscriptions, {
+    action: 'subscribe',
+    user_email: userEmail,
+    species_list: speciesList
+  });
+  return writeCachedSubscriptions(userEmail, speciesList);
 }
 
-export async function unsubscribeSpecies(species) {
+export async function unsubscribeSpecies(species, userEmail) {
   if (config.useMocks) {
     return mockUnsubscribeSpecies(species);
   }
   ensureBaseUrl(config.awsApiBaseUrl, 'AWS');
-  const { data } = await awsClient.delete(config.paths.subscriptions, { data: { species } });
-  return unwrapResponsePayload(data);
+  await awsClient.post(config.paths.subscriptions, {
+    action: 'unsubscribe',
+    user_email: userEmail,
+    species_list: [species]
+  });
+  const remaining = readCachedSubscriptions(userEmail).filter((item) => item !== species);
+  return writeCachedSubscriptions(userEmail, remaining);
 }

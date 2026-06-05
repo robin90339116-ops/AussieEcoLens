@@ -28,7 +28,8 @@ export default function TagManage() {
         tags,
         operation
       });
-      message.success(`Tag update submitted${response?.updated ? `: ${response.updated}` : ''}`);
+      const updatedCount = Array.isArray(response?.updated) ? response.updated.length : response?.updated;
+      message.success(`Tag update submitted${updatedCount ? `: ${updatedCount} updated` : ''}`);
     } catch (error) {
       message.error(getErrorMessage(error, 'Tag update failed'));
     } finally {

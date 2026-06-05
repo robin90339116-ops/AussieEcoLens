@@ -12,13 +12,14 @@ import { useAuth } from '../context/AuthContext';
 
 export default function Subscribe() {
   const { user } = useAuth();
+  const userEmail = user?.email || user?.username || '';
   const [selected, setSelected] = useState([]);
   const [loading, setLoading] = useState(false);
 
   const loadSubscriptions = async () => {
     setLoading(true);
     try {
-      setSelected(await getSubscriptions());
+      setSelected(await getSubscriptions(userEmail));
     } catch (error) {
       message.error(getErrorMessage(error, 'Could not load subscriptions'));
     } finally {
@@ -28,12 +29,16 @@ export default function Subscribe() {
 
   useEffect(() => {
     loadSubscriptions();
-  }, []);
+  }, [userEmail]);
 
   const handleSave = async () => {
+    if (!userEmail) {
+      message.error('Signed-in email is required');
+      return;
+    }
     setLoading(true);
     try {
-      const next = await saveSubscriptions(selected);
+      const next = await saveSubscriptions(selected, userEmail);
       if (Array.isArray(next)) {
         setSelected(next);
       }
@@ -46,9 +51,13 @@ export default function Subscribe() {
   };
 
   const handleUnsubscribe = async (species) => {
+    if (!userEmail) {
+      message.error('Signed-in email is required');
+      return;
+    }
     setLoading(true);
     try {
-      const next = await unsubscribeSpecies(species);
+      const next = await unsubscribeSpecies(species, userEmail);
       setSelected(Array.isArray(next) ? next : selected.filter((item) => item !== species));
       message.success('Subscription removed');
     } catch (error) {
@@ -62,7 +71,7 @@ export default function Subscribe() {
     <section className="page-grid subscribe-grid">
       <div className="page-heading">
         <Typography.Title level={2}>Tag notifications</Typography.Title>
-        <Typography.Text type="secondary">{user?.email}</Typography.Text>
+        <Typography.Text type="secondary">{userEmail}</Typography.Text>
       </div>
 
       <div className="tool-panel">
