@@ -29,11 +29,18 @@ This branch contains the urgent D group API work for AussieEcoLens.
 
 Frontend should start from `docs/db-and-queries.md`.
 
-A needs to connect API Gateway + Cognito Authorizer to the AWS Lambda handlers.
+For the formal frontend demo, the preferred route is:
+
+1. Frontend calls only A's API Gateway endpoints.
+2. A's API Gateway uses Cognito Authorizer.
+3. A's API Gateway routes D's AWS Lambda handlers for Q3/Q4/Q5/Q6 and notifications.
+4. B's ML Lambda stays behind backend services and is not called directly by the frontend.
+
+D's GCP Q1/Q2 endpoints are the only exception. If they are not routed through A's API Gateway, they must be public HTTPS endpoints protected by the included Cognito JWT verification middleware.
 
 B can import `lambda/shared/aussie_ecolens_db.py` to write records after ML tagging, and can call the notification publish helper after a new record is stored.
 
-C can use the documented Q1/Q2/Q3/Q4/Q5/Q6 request and response formats to wire the UI.
+C can use the documented Q1/Q2/Q3/Q4/Q5/Q6 request and response formats to wire the UI, but should confirm whether Q1/Q2 are exposed through A's API Gateway or directly through the protected GCP HTTPS URLs.
 
 ## Still needed before final demo
 
@@ -46,4 +53,3 @@ C can use the documented Q1/Q2/Q3/Q4/Q5/Q6 request and response formats to wire 
   - `ML_QUERY_LAMBDA_NAME`
 - Final endpoint URLs pasted back into `docs/db-and-queries.md`.
 - Final team report, individual report, and architecture figure.
-

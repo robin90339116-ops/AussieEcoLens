@@ -7,6 +7,12 @@ These handlers cover D group's AWS-side query and management APIs:
 - `q5_update_tags`: batch add/remove tags.
 - `q6_delete_file`: delete original object, thumbnail object, and DynamoDB record.
 
+Formal demo integration rule:
+
+- These Lambda handlers must be attached to A's API Gateway with Cognito Authorizer.
+- Frontend should call A's API Gateway, not these Lambda functions directly.
+- B's ML Lambda must remain private behind backend services. Q4 invokes it through `ML_QUERY_LAMBDA_NAME`.
+
 Package each function with `Project/lambda/shared` on the Python path or publish
 `lambda/shared` as a Lambda layer under `/opt/python`.
 

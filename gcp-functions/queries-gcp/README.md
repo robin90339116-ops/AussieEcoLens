@@ -2,6 +2,12 @@
 
 This directory is self-contained for deploying D group's GCP APIs.
 
+Formal demo integration rule:
+
+- Prefer routing Q1/Q2 through A's API Gateway so the frontend has one backend entry point.
+- If Q1/Q2 are exposed directly from GCP, they must be public HTTPS endpoints protected by Cognito JWT verification.
+- Do not set `AUTH_REQUIRED=false` outside local smoke tests.
+
 Functions:
 
 - `q1_query_by_tags`: Q1 AND query by species counts.
@@ -44,3 +50,4 @@ gcloud functions deploy q2_query_by_species \
   --set-env-vars=AWS_REGION=ap-southeast-2,FILES_TABLE=AussieEcoLensFiles,COGNITO_REGION=ap-southeast-2,COGNITO_USER_POOL_ID=YOUR_POOL_ID,COGNITO_APP_CLIENT_ID=YOUR_CLIENT_ID
 ```
 
+`--allow-unauthenticated` only makes the HTTPS trigger reachable. Application-level Cognito JWT verification still protects the function when `AUTH_REQUIRED=true`.

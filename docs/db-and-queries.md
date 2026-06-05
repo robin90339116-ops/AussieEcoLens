@@ -14,6 +14,17 @@ D group owns:
 
 Reports and final slides are intentionally not included yet.
 
+## Integration boundary for demo
+
+For the formal frontend demo, use A's API Gateway as the main public backend entry point:
+
+- Frontend should call A's API Gateway whenever possible.
+- D's AWS Lambda handlers for Q3/Q4/Q5/Q6 and notifications must be attached behind A's API Gateway with Cognito Authorizer.
+- B's ML Lambda must stay behind backend services. The frontend must not call B directly.
+- D's GCP Q1/Q2 endpoints may be exposed directly only if they are public HTTPS endpoints with Cognito JWT verification enabled.
+
+This repo already includes the GCP JWT verification middleware for Q1/Q2. Keep `AUTH_REQUIRED=true` outside local smoke tests.
+
 ## Environment
 
 Common AWS environment variables:
@@ -118,7 +129,7 @@ Frontend should call protected endpoints with:
 Authorization: Bearer <cognito_jwt>
 ```
 
-GCP Q1/Q2 verifies Cognito JWKS, RS256 signature, issuer, audience, and expiry.
+AWS-side D endpoints should normally receive this through A's API Gateway + Cognito Authorizer. GCP Q1/Q2 verifies Cognito JWKS, RS256 signature, issuer, audience, and expiry when exposed directly.
 
 ## Q1: tag + count AND query
 
@@ -127,10 +138,12 @@ Owner: D. Platform: GCP Cloud Functions.
 Endpoint:
 
 ```http
-POST <GCP_Q1_URL>
+POST <A_API_GATEWAY_Q1_URL or GCP_Q1_URL>
 Authorization: Bearer <token>
 Content-Type: application/json
 ```
+
+Preferred demo route: A API Gateway. Direct GCP route is acceptable only when `AUTH_REQUIRED=true` and Cognito JWT settings are configured.
 
 Request:
 
@@ -183,10 +196,12 @@ Owner: D. Platform: GCP Cloud Functions.
 Endpoint:
 
 ```http
-POST <GCP_Q2_URL>
+POST <A_API_GATEWAY_Q2_URL or GCP_Q2_URL>
 Authorization: Bearer <token>
 Content-Type: application/json
 ```
+
+Preferred demo route: A API Gateway. Direct GCP route is acceptable only when `AUTH_REQUIRED=true` and Cognito JWT settings are configured.
 
 Request:
 
@@ -472,8 +487,10 @@ curl -X POST "$AWS_NOTIFICATION_URL" \
 3. Package `Project/lambda/shared` as a layer or copy it into Lambda packages.
 4. Deploy AWS Lambdas under `Project/lambda/queries-aws`.
 5. Ask A to connect API Gateway + Cognito Authorizer to Q3/Q4/Q5/Q6 and notification endpoints.
-6. Deploy GCP Q1/Q2 functions from `Project/gcp-functions/queries-gcp`.
-7. Give C the endpoint URLs and this API contract.
+6. Keep B's ML Lambda private behind backend services. Q4 invokes it by `ML_QUERY_LAMBDA_NAME`.
+7. Deploy GCP Q1/Q2 functions from `Project/gcp-functions/queries-gcp` with `AUTH_REQUIRED=true`.
+8. Prefer routing Q1/Q2 through A's API Gateway. If not, give C the protected GCP HTTPS URLs and confirm Cognito JWT settings are configured.
+9. Give C the final endpoint URLs and this API contract.
 
 ## Current status
 
@@ -492,4 +509,3 @@ Not done by request:
 - D6.3/D6.4 team report.
 - D6.5 individual report.
 - Final cloud deployment, because real AWS/GCP credentials and A's Cognito values are needed.
-
