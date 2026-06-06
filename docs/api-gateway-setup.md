@@ -79,3 +79,17 @@ Backend details:
 - Hash algorithm is SHA-256 team-wide (frontend must NOT use MD5)
 
 Tested 2026-06-05: without token 401; with token 200 {"duplicate": false} for both "checksum" and "file_hash" field names. Working.
+
+## 5. EcoLens-Trigger (S3 forwarding Lambda)
+
+Function: EcoLens-Trigger, python3.12, handler s3_trigger_lambda.lambda_handler, timeout 300s, memory 256MB, LabRole.
+Package: s3_trigger_lambda.py + aussie_ecolens_db.py zipped together.
+Env vars: OCI_ML_ENDPOINT, OCI_API_TOKEN (secret, never in git), PRESIGN_EXPIRY=600, REQUEST_TIMEOUT=300, DEFAULT_OWNER_ID=demo-user.
+
+S3 event notification on bucket aussie-ecolens-35346906: prefix uploads/ only (thumbnails/ excluded to avoid loops), target EcoLens-Trigger, with lambda add-permission for s3.amazonaws.com.
+
+Verified:
+- Manual invoke: wild boar image -> tags {"wild boar": 1}, persisted: true, checksum auto-computed by the ML service.
+- check-dup with that checksum -> 409 duplicate. Dedup loop closed end-to-end.
+- Fully automatic: cat image uploaded -> S3 event -> trigger -> ML service -> DynamoDB record (domestic_cat) with no manual invocation.
+Note: THUMBNAIL_LAMBDA_NAME / NOTIFY_LAMBDA_NAME not yet configured (pending those deployments).
