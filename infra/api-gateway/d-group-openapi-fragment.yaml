@@ -38,9 +38,9 @@ paths:
         "200":
           description: Original media URL lookup result
 
-  /query/image:
+  /query/by-file:
     post:
-      summary: Q4 temporary query image to tags, then matching files
+      summary: Q4 temporary query file to tags, then matching files
       security:
         - CognitoAuthorizer: []
       x-amazon-apigateway-integration:
@@ -95,4 +95,3 @@ paths:
       responses:
         "200":
           description: Notification action result
-

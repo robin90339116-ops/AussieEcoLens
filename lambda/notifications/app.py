@@ -6,8 +6,20 @@ from pathlib import Path
 SHARED_DIR = Path(__file__).resolve().parents[1] / "shared"
 sys.path.insert(0, str(SHARED_DIR))
 
+from aussie_ecolens_db import list_subscriptions
 from http_utils import parse_json_body, response
 from sns_helpers import publish_new_file_notification, subscribe_email, unsubscribe_email
+
+
+def _species_list(body):
+    value = body.get("species_list", body.get("species"))
+    if isinstance(value, str):
+        return [value]
+    return value
+
+
+def _user_email(body):
+    return body.get("user_email") or body.get("email")
 
 
 def lambda_handler(event, context):
@@ -15,18 +27,26 @@ def lambda_handler(event, context):
     if method == "OPTIONS":
         return response(204, {})
 
+    if method == "GET":
+        params = event.get("queryStringParameters") or {}
+        user_email = params.get("user_email") or params.get("email")
+        return response(200, {"subscriptions": list_subscriptions(user_email=user_email)})
+
     body = parse_json_body(event)
     action = str(body.get("action", "")).lower()
 
+    if action in {"list", "get", "subscriptions"}:
+        return response(200, {"subscriptions": list_subscriptions(user_email=_user_email(body))})
+
     if action == "subscribe":
-        user_email = body.get("user_email")
-        species_list = body.get("species_list") or body.get("species")
+        user_email = _user_email(body)
+        species_list = _species_list(body)
         if not user_email or not isinstance(species_list, list) or not species_list:
             return response(400, {"error": "user_email and non-empty species_list are required"})
         return response(200, subscribe_email(user_email=user_email, species_list=species_list))
 
     if action == "unsubscribe":
-        user_email = body.get("user_email")
+        user_email = _user_email(body)
         if not user_email:
             return response(400, {"error": "user_email is required"})
         return response(
@@ -34,7 +54,7 @@ def lambda_handler(event, context):
             unsubscribe_email(
                 user_email=user_email,
                 subscription_arn=body.get("subscription_arn"),
-                species_list=body.get("species_list"),
+                species_list=_species_list(body),
             ),
         )
 

@@ -19,7 +19,7 @@ def auth_required() -> bool:
 
 
 def _issuer() -> str:
-    region = os.getenv("COGNITO_REGION") or os.getenv("AWS_REGION", "ap-southeast-2")
+    region = os.getenv("COGNITO_REGION") or os.getenv("AWS_REGION", "us-east-1")
     pool_id = os.getenv("COGNITO_USER_POOL_ID")
     if not pool_id:
         raise RuntimeError("COGNITO_USER_POOL_ID is not configured")

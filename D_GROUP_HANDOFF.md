@@ -14,7 +14,7 @@ This branch contains the urgent D group API work for AussieEcoLens.
   - `lambda/shared/sns_helpers.py`
 - AWS Lambda handlers:
   - Q3 thumbnail URL to original URL lookup
-  - Q4 query image search, calling B's ML Lambda and not storing the query image
+  - Q4 query file search, calling B's Oracle tagging endpoint and not storing the query image
   - Q5 batch add/remove tags
   - Q6 delete file from S3 and DynamoDB
   - notification subscribe/unsubscribe/publish helper
@@ -43,7 +43,7 @@ For the formal frontend demo, the preferred route is:
 1. Frontend calls only A's API Gateway endpoints.
 2. A's API Gateway uses Cognito Authorizer.
 3. A's API Gateway routes D's AWS Lambda handlers for Q3/Q4/Q5/Q6 and notifications.
-4. B's ML Lambda stays behind backend services and is not called directly by the frontend.
+4. B's Oracle tagging token stays behind backend services and is not exposed to the frontend.
 
 D's GCP Q1/Q2 endpoints are the only exception. If they are not routed through A's API Gateway, they must be public HTTPS endpoints protected by the included Cognito JWT verification middleware.
 
@@ -58,8 +58,9 @@ C can use the documented Q1/Q2/Q3/Q4/Q5/Q6 request and response formats to wire 
   - `COGNITO_USER_POOL_ID`
   - `COGNITO_APP_CLIENT_ID`
   - `COGNITO_REGION`
-- B's ML query Lambda name for Q4:
-  - `ML_QUERY_LAMBDA_NAME`
+- B's Oracle tagging values for Q4:
+  - `ORACLE_TAG_UPLOAD_URL`
+  - `ORACLE_API_TOKEN`
 - Final endpoint URLs pasted back into `docs/db-and-queries.md`.
 - Final team report and individual report.
 - Final architecture figure redraw with official AWS/GCP icons if required.

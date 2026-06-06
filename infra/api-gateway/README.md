@@ -20,8 +20,7 @@ Formal demo boundary:
 
 - Frontend should call A's API Gateway.
 - D's Q3/Q4/Q5/Q6 and notification Lambdas sit behind A's API Gateway.
-- B's ML Lambda remains private and is called only by Q4 through
-  `ML_QUERY_LAMBDA_NAME`.
+- B's Oracle tagging endpoint remains private behind backend services. Q4 calls
+  it with `ORACLE_TAG_UPLOAD_URL` and `ORACLE_API_TOKEN`.
 - GCP Q1/Q2 can either be routed through A's API Gateway or exposed directly as
   protected HTTPS endpoints with Cognito JWT verification enabled.
-

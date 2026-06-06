@@ -10,13 +10,13 @@ flowchart LR
     APIGW --> Auth["Cognito Authorizer"]
 
     APIGW --> Q3["D AWS Lambda Q3\nthumbnail lookup"]
-    APIGW --> Q4["D AWS Lambda Q4\nquery image search"]
+    APIGW --> Q4["D AWS Lambda Q4\nquery file search"]
     APIGW --> Q5["D AWS Lambda Q5\nupdate tags"]
     APIGW --> Q6["D AWS Lambda Q6\ndelete file"]
     APIGW --> NotifyApi["D AWS Lambda\nnotifications API"]
 
-    Q4 --> BML["B ML Lambda\nprivate backend only"]
-    BML --> Q4
+    Q4 --> Oracle["B Oracle tagging endpoint\nprivate backend token"]
+    Oracle --> Q4
 
     Q3 --> DB["DynamoDB files table"]
     Q4 --> DB
@@ -43,7 +43,6 @@ Key boundaries:
 
 - Frontend calls A API Gateway for the formal demo whenever possible.
 - D AWS Lambdas are backend handlers behind A API Gateway and Cognito.
-- B ML Lambda stays private and is invoked only by backend code.
+- B Oracle token stays private and is used only by backend code.
 - GCP Q1/Q2 must verify Cognito JWTs when exposed directly.
 - Query images for Q4 are not stored in S3 or DynamoDB.
-

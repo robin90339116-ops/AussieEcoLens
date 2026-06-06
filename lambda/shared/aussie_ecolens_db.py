@@ -15,7 +15,7 @@ DEFAULT_NOTIFICATIONS_TABLE = "AussieEcoLensNotificationsSub"
 
 
 def _resource():
-    return boto3.resource("dynamodb", region_name=os.getenv("AWS_REGION", "ap-southeast-2"))
+    return boto3.resource("dynamodb", region_name=os.getenv("AWS_REGION", "us-east-1"))
 
 
 def files_table():
@@ -68,7 +68,7 @@ def write_record(
     original_url: str,
     thumbnail_url: str | None,
     tags: dict[str, Any] | list[str] | None,
-    owner_id: str,
+    owner_id: str | None = None,
     file_id: str | None = None,
     original_s3_key: str | None = None,
     thumbnail_s3_key: str | None = None,
@@ -82,7 +82,7 @@ def write_record(
         "original_url": original_url,
         "thumbnail_url": thumbnail_url or "",
         "tags": normalise_tags(tags),
-        "owner_id": owner_id,
+        "owner_id": owner_id or os.getenv("DEFAULT_OWNER_ID", "unknown-owner"),
         "upload_time": timestamp,
         "last_modified": timestamp,
     }
@@ -258,3 +258,10 @@ def delete_subscription(*, user_email: str, species_list: list[str] | None = Non
     )
     return {"user_email": user_email, "deleted": list(remove_set), "remaining": remaining}
 
+
+def list_subscriptions(*, user_email: str | None = None) -> list[dict[str, Any]]:
+    table = notifications_table()
+    if user_email:
+        item = table.get_item(Key={"user_email": user_email}).get("Item")
+        return [json_safe(item)] if item else []
+    return [json_safe(item) for item in table.scan().get("Items", [])]

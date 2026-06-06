@@ -34,6 +34,35 @@ def body_of(response: dict):
     return json.loads(response["body"])
 
 
+def multipart_event(file_bytes: bytes, fields: dict[str, str] | None = None):
+    boundary = "----testboundary"
+    parts: list[bytes] = []
+    for name, value in (fields or {}).items():
+        parts.extend(
+            [
+                f"--{boundary}\r\n".encode("utf-8"),
+                f'Content-Disposition: form-data; name="{name}"\r\n\r\n'.encode("utf-8"),
+                str(value).encode("utf-8"),
+                b"\r\n",
+            ]
+        )
+    parts.extend(
+        [
+            f"--{boundary}\r\n".encode("utf-8"),
+            b'Content-Disposition: form-data; name="file"; filename="query.jpg"\r\n',
+            b"Content-Type: image/jpeg\r\n\r\n",
+            file_bytes,
+            b"\r\n",
+            f"--{boundary}--\r\n".encode("utf-8"),
+        ]
+    )
+    return {
+        "requestContext": {"http": {"method": "POST"}},
+        "headers": {"content-type": f"multipart/form-data; boundary={boundary}"},
+        "body": b"".join(parts),
+    }
+
+
 class HandlerTests(unittest.TestCase):
     def test_http_utils_parses_base64_json_body(self):
         http_utils = load_module("test_http_utils", "lambda/shared/http_utils.py")
@@ -62,12 +91,12 @@ class HandlerTests(unittest.TestCase):
 
     def test_q4_query_image_does_not_store_query_image(self):
         q4 = load_module("test_q4_app", "lambda/queries-aws/q4_image_search/app.py")
-        q4._invoke_ml_query_lambda = lambda payload: {"tags": {"wombat": 2, "magpie": 1}}
+        q4._invoke_oracle_tag_upload = lambda file_data: {"tags": {"wombat": 2, "magpie": 1}}
         q4.query_by_tag_counts = lambda tags, owner_id=None, limit=100: [
             {"file_id": "file-1", "tags": tags}
         ]
 
-        response = q4.lambda_handler(api_event({"image_base64": "abc", "limit": 10}), None)
+        response = q4.lambda_handler(api_event({"image_base64": "YWJj", "limit": 10}), None)
         payload = body_of(response)
         self.assertEqual(response["statusCode"], 200)
         self.assertFalse(payload["query_image_stored"])
@@ -78,6 +107,18 @@ class HandlerTests(unittest.TestCase):
         q4 = load_module("test_q4_app_missing", "lambda/queries-aws/q4_image_search/app.py")
         response = q4.lambda_handler(api_event({}), None)
         self.assertEqual(response["statusCode"], 400)
+
+    def test_q4_accepts_multipart_file(self):
+        q4 = load_module("test_q4_app_multipart", "lambda/queries-aws/q4_image_search/app.py")
+        q4._invoke_oracle_tag_upload = lambda file_data: {"species": ["koala"]}
+        q4.query_by_tag_counts = lambda tags, owner_id=None, limit=100: [
+            {"file_id": "file-1", "tags": tags, "owner_id": owner_id}
+        ]
+
+        response = q4.lambda_handler(multipart_event(b"\xff\xd8image", {"limit": "5", "owner_id": "user-1"}), None)
+        payload = body_of(response)
+        self.assertEqual(response["statusCode"], 200)
+        self.assertEqual(payload["tags"], {"koala": 1})
 
     def test_q5_update_tags_partial_success(self):
         q5 = load_module("test_q5_app", "lambda/queries-aws/q5_update_tags/app.py")
@@ -108,7 +149,7 @@ class HandlerTests(unittest.TestCase):
 
     def test_q6_delete_file_calls_media_and_db_delete(self):
         q6 = load_module("test_q6_app", "lambda/queries-aws/q6_delete_file/app.py")
-        item = {"file_id": "file-1", "original_url": "https://bucket.s3.ap-southeast-2.amazonaws.com/a.jpg"}
+        item = {"file_id": "file-1", "original_url": "https://bucket.s3.us-east-1.amazonaws.com/a.jpg"}
         q6.get_by_file_id = lambda file_id: item
         q6._delete_media_objects = lambda record: [{"bucket": "bucket", "key": "a.jpg"}]
         q6.delete_record = lambda file_id=None, url=None: {"file_id": file_id}
@@ -116,8 +157,8 @@ class HandlerTests(unittest.TestCase):
         response = q6.lambda_handler(api_event({"file_id": "file-1"}, method="DELETE"), None)
         payload = body_of(response)
         self.assertEqual(response["statusCode"], 200)
-        self.assertEqual(payload["deleted_file_id"], "file-1")
-        self.assertEqual(payload["deleted_s3_objects"][0]["key"], "a.jpg")
+        self.assertEqual(payload["deleted"][0]["deleted_file_id"], "file-1")
+        self.assertEqual(payload["deleted"][0]["deleted_s3_objects"][0]["key"], "a.jpg")
 
     def test_notifications_subscribe_validation(self):
         notifications = load_module("test_notifications_app", "lambda/notifications/app.py")
@@ -144,7 +185,21 @@ class HandlerTests(unittest.TestCase):
         self.assertEqual(response["statusCode"], 200)
         self.assertTrue(body_of(response)["confirmation_required"])
 
+    def test_notifications_list_get(self):
+        notifications = load_module("test_notifications_app_list", "lambda/notifications/app.py")
+        notifications.list_subscriptions = lambda user_email=None: [
+            {"user_email": user_email or "student@example.com", "species_list": ["wombat"]}
+        ]
+        response = notifications.lambda_handler(
+            {
+                "requestContext": {"http": {"method": "GET"}},
+                "queryStringParameters": {"email": "student@example.com"},
+            },
+            None,
+        )
+        self.assertEqual(response["statusCode"], 200)
+        self.assertEqual(body_of(response)["subscriptions"][0]["species_list"], ["wombat"])
+
 
 if __name__ == "__main__":
     unittest.main()
-

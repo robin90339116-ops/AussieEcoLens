@@ -6,13 +6,15 @@ Use this checklist after AWS/GCP accounts are available.
 
 - A confirms final API Gateway base URL.
 - A confirms Cognito User Pool ID, App Client ID, issuer, and JWT audience.
-- B confirms ML query Lambda name for Q4.
+- B confirms Oracle tagging upload URL and token for Q4.
 - D confirms DynamoDB table name and indexes:
   - `AussieEcoLensFiles`
   - `checksum-index`
   - `owner_id-index`
   - `AussieEcoLensNotificationsSub`
 - D confirms SNS topic ARN and email subscription behavior.
+- If GCP reads DynamoDB with AWS Academy credentials, refresh the GCP AWS
+  environment variables before the demo because session credentials expire.
 
 ## Endpoint routing
 
@@ -23,13 +25,13 @@ Preferred formal demo route:
 | Q1 tag-count AND query | A API Gateway or protected GCP HTTPS | GCP `q1_query_by_tags` |
 | Q2 species query | A API Gateway or protected GCP HTTPS | GCP `q2_query_by_species` |
 | Q3 thumbnail reverse lookup | A API Gateway | AWS Lambda `q3_thumbnail_lookup` |
-| Q4 query image search | A API Gateway | AWS Lambda `q4_image_search`, then B ML Lambda |
+| Q4 query file search | A API Gateway `/query/by-file` | AWS Lambda `q4_image_search`, then B Oracle tagging endpoint |
 | Q5 update tags | A API Gateway | AWS Lambda `q5_update_tags` |
 | Q6 delete file | A API Gateway | AWS Lambda `q6_delete_file` |
 | Notifications | A API Gateway | AWS Lambda `notifications` and SNS |
 
 Q1/Q2 can be direct GCP HTTPS only when Cognito JWT verification is enabled.
-B's ML Lambda is never called by the frontend.
+B's Oracle token is never exposed to the frontend.
 
 ## Smoke-test sequence
 
@@ -39,7 +41,7 @@ B's ML Lambda is never called by the frontend.
 4. Run Q2 with one known species and confirm file list.
 5. Run Q3 with a known thumbnail URL and confirm original URL.
 6. Run Q4 with a query image and confirm:
-   - B ML Lambda returns tags.
+   - B Oracle tagging endpoint returns tags.
    - D returns matching records.
    - Query image is not stored in S3 or DynamoDB.
 7. Run Q5 add/remove tags and confirm `last_modified` changes.
@@ -54,6 +56,9 @@ B's ML Lambda is never called by the frontend.
 - `<GCP_Q2_URL>`
 - `<COGNITO_USER_POOL_ID>`
 - `<COGNITO_APP_CLIENT_ID>`
-- `<ML_QUERY_LAMBDA_NAME>`
+- `<ORACLE_TAG_UPLOAD_URL>`
+- `<ORACLE_API_TOKEN>`
 - `<SNS_TOPIC_ARN>`
-
+- `<AWS_ACCESS_KEY_ID>`
+- `<AWS_SECRET_ACCESS_KEY>`
+- `<AWS_SESSION_TOKEN>`

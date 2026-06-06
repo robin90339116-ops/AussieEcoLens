@@ -16,6 +16,11 @@ Functions for D APIs:
 - `query_by_species(species, owner_id=None, limit=100)`
 - `update_tags(urls, tags, operation)`
 - `delete_record(file_id=None, url=None)`
+- `list_subscriptions(user_email=None)`
+
+If upload metadata does not yet include the real owner, set
+`DEFAULT_OWNER_ID=unknown-owner` or another team-agreed placeholder before B
+writes records. Replace it with the Cognito owner once A/B pass that value.
 
 Packaging options:
 

@@ -20,7 +20,7 @@ For the formal frontend demo:
 - Frontend should call A's API Gateway whenever possible.
 - D's AWS Lambda handlers must be attached behind A's API Gateway with Cognito
   Authorizer.
-- B's ML Lambda must remain private behind backend services.
+- B's Oracle tagging token must remain private behind backend services.
 - D's GCP Q1/Q2 endpoints may be exposed directly only as HTTPS endpoints with
   Cognito JWT verification enabled.
 
@@ -51,5 +51,4 @@ Use the project Python environment:
 ## Not included
 
 Real deployment still needs the team's AWS and GCP accounts, A's Cognito values,
-B's ML Lambda name, and final endpoint URLs.
-
+B's Oracle tagging URL/token, and final endpoint URLs.

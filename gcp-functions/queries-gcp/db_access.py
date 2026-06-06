@@ -8,7 +8,7 @@ import boto3
 
 
 def _table():
-    dynamodb = boto3.resource("dynamodb", region_name=os.getenv("AWS_REGION", "ap-southeast-2"))
+    dynamodb = boto3.resource("dynamodb", region_name=os.getenv("AWS_REGION", "us-east-1"))
     return dynamodb.Table(os.getenv("FILES_TABLE", "AussieEcoLensFiles"))
 
 

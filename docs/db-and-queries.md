@@ -20,7 +20,7 @@ For the formal frontend demo, use A's API Gateway as the main public backend ent
 
 - Frontend should call A's API Gateway whenever possible.
 - D's AWS Lambda handlers for Q3/Q4/Q5/Q6 and notifications must be attached behind A's API Gateway with Cognito Authorizer.
-- B's ML Lambda must stay behind backend services. The frontend must not call B directly.
+- B's Oracle tagging token must stay behind backend services. The frontend must not call B directly.
 - D's GCP Q1/Q2 endpoints may be exposed directly only if they are public HTTPS endpoints with Cognito JWT verification enabled.
 
 This repo already includes the GCP JWT verification middleware for Q1/Q2. Keep `AUTH_REQUIRED=true` outside local smoke tests.
@@ -29,24 +29,30 @@ This repo already includes the GCP JWT verification middleware for Q1/Q2. Keep `
 
 Common AWS environment variables:
 
-- `AWS_REGION=ap-southeast-2`
+- `AWS_REGION=us-east-1`
 - `FILES_TABLE=AussieEcoLensFiles`
 - `NOTIFICATIONS_TABLE=AussieEcoLensNotificationsSub`
 - `CHECKSUM_INDEX=checksum-index`
 - `SNS_TOPIC_ARN=arn:aws:sns:...`
 - `CORS_ALLOW_ORIGIN=http://localhost:5173`
+- `DEFAULT_OWNER_ID=unknown-owner`
 
 GCP Function environment variables:
 
-- `AWS_REGION=ap-southeast-2`
+- `AWS_REGION=us-east-1`
 - `FILES_TABLE=AussieEcoLensFiles`
-- `COGNITO_REGION=ap-southeast-2`
+- `COGNITO_REGION=us-east-1`
 - `COGNITO_USER_POOL_ID=<from A>`
 - `COGNITO_APP_CLIENT_ID=<from A>`
 - `AUTH_REQUIRED=true`
 - `CORS_ALLOW_ORIGIN=<frontend origin>`
 
 For local smoke tests only, `AUTH_REQUIRED=false` can be used.
+
+For the current team deployment, keep both `AWS_REGION` and `COGNITO_REGION` as
+`us-east-1` unless A confirms a different Cognito region. If GCP uses AWS
+Academy credentials to read DynamoDB, refresh those credentials in GCP before
+each demo or long integration session because they expire.
 
 ## DynamoDB schema
 
@@ -248,7 +254,7 @@ Request:
 
 ```json
 {
-  "thumbnail_url": "https://bucket.s3.ap-southeast-2.amazonaws.com/thumbs/file-001.jpg"
+  "thumbnail_url": "https://bucket.s3.us-east-1.amazonaws.com/thumbs/file-001.jpg"
 }
 ```
 
@@ -272,36 +278,34 @@ Curl:
 curl -X POST "$AWS_Q3_URL" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"thumbnail_url":"https://bucket.s3.ap-southeast-2.amazonaws.com/thumbs/file-001.jpg"}'
+  -d '{"thumbnail_url":"https://bucket.s3.us-east-1.amazonaws.com/thumbs/file-001.jpg"}'
 ```
 
 ## Q4: query by uploaded image
 
-Owner: D + B. Platform: AWS Lambda + B's ML Lambda.
+Owner: D + B. Platform: AWS Lambda + B's Oracle tagging endpoint.
 
 Endpoint:
 
 ```http
-POST <AWS_Q4_URL>
+POST <A_API_GATEWAY_BASE_URL>/query/by-file
 Authorization: Bearer <token>
-Content-Type: application/json
+Content-Type: multipart/form-data
 ```
 
 Request:
 
-```json
-{
-  "image_base64": "<base64 image bytes>",
-  "content_type": "image/jpeg",
-  "limit": 50
-}
+```http
+file=<uploaded image file>
 ```
 
 Alternative request:
 
 ```json
 {
-  "image_url": "https://temporary-query-image-url",
+  "image_base64": "<base64 image bytes>",
+  "filename": "query.jpg",
+  "content_type": "image/jpeg",
   "limit": 50
 }
 ```
@@ -320,7 +324,8 @@ Response:
 }
 ```
 
-Constraint: the query image is not written to S3 or DynamoDB.
+Constraint: the query image is not written to S3 or DynamoDB. B's Oracle token
+is stored only in the Q4 Lambda environment as `ORACLE_API_TOKEN`.
 
 ## Q5: batch add/remove tags
 
@@ -338,7 +343,7 @@ Add request:
 
 ```json
 {
-  "urls": ["https://bucket.s3.ap-southeast-2.amazonaws.com/originals/file-001.jpg"],
+  "urls": ["https://bucket.s3.us-east-1.amazonaws.com/originals/file-001.jpg"],
   "tags": {
     "wombat": 2
   },
@@ -350,7 +355,7 @@ Remove request:
 
 ```json
 {
-  "urls": ["https://bucket.s3.ap-southeast-2.amazonaws.com/originals/file-001.jpg"],
+  "urls": ["https://bucket.s3.us-east-1.amazonaws.com/originals/file-001.jpg"],
   "tags": ["wombat"],
   "operation": "remove"
 }
@@ -371,7 +376,7 @@ Curl:
 curl -X POST "$AWS_Q5_URL" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"urls":["https://bucket.s3.ap-southeast-2.amazonaws.com/originals/file-001.jpg"],"tags":{"wombat":2},"operation":"add"}'
+  -d '{"urls":["https://bucket.s3.us-east-1.amazonaws.com/originals/file-001.jpg"],"tags":{"wombat":2},"operation":"add"}'
 ```
 
 ## Q6: delete file
@@ -390,7 +395,10 @@ Request:
 
 ```json
 {
-  "file_id": "file-001"
+  "urls": [
+    "https://bucket.s3.us-east-1.amazonaws.com/originals/file-001.jpg",
+    "https://bucket.s3.us-east-1.amazonaws.com/originals/file-002.jpg"
+  ]
 }
 ```
 
@@ -398,7 +406,7 @@ Alternative request:
 
 ```json
 {
-  "url": "https://bucket.s3.ap-southeast-2.amazonaws.com/originals/file-001.jpg"
+  "file_ids": ["file-001", "file-002"]
 }
 ```
 
@@ -406,14 +414,19 @@ Response:
 
 ```json
 {
-  "deleted_file_id": "file-001",
-  "deleted_s3_objects": [
+  "deleted": [
     {
-      "bucket": "bucket",
-      "key": "originals/file-001.jpg"
+      "deleted_file_id": "file-001",
+      "deleted_s3_objects": [
+        {
+          "bucket": "bucket",
+          "key": "originals/file-001.jpg"
+        }
+      ],
+      "deleted_record": {}
     }
   ],
-  "deleted_record": {}
+  "errors": []
 }
 ```
 
@@ -423,7 +436,7 @@ Curl:
 curl -X DELETE "$AWS_Q6_URL" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"file_id":"file-001"}'
+  -d '{"urls":["https://bucket.s3.us-east-1.amazonaws.com/originals/file-001.jpg"]}'
 ```
 
 ## Notification API
@@ -443,8 +456,8 @@ Subscribe:
 ```json
 {
   "action": "subscribe",
-  "user_email": "student@example.com",
-  "species_list": ["wombat", "magpie"]
+  "email": "student@example.com",
+  "species": ["wombat", "magpie"]
 }
 ```
 
@@ -453,8 +466,24 @@ Unsubscribe:
 ```json
 {
   "action": "unsubscribe",
-  "user_email": "student@example.com",
-  "species_list": ["wombat"]
+  "email": "student@example.com",
+  "species": "wombat"
+}
+```
+
+List subscriptions:
+
+```http
+GET <AWS_NOTIFICATION_URL>?email=student@example.com
+Authorization: Bearer <token>
+```
+
+Alternative POST list request:
+
+```json
+{
+  "action": "list",
+  "email": "student@example.com"
 }
 ```
 
@@ -487,7 +516,7 @@ curl -X POST "$AWS_NOTIFICATION_URL" \
 3. Package `Project/lambda/shared` as a layer or copy it into Lambda packages.
 4. Deploy AWS Lambdas under `Project/lambda/queries-aws`.
 5. Ask A to connect API Gateway + Cognito Authorizer to Q3/Q4/Q5/Q6 and notification endpoints.
-6. Keep B's ML Lambda private behind backend services. Q4 invokes it by `ML_QUERY_LAMBDA_NAME`.
+6. Keep B's Oracle token private in Q4 Lambda environment variables.
 7. Deploy GCP Q1/Q2 functions from `Project/gcp-functions/queries-gcp` with `AUTH_REQUIRED=true`.
 8. Prefer routing Q1/Q2 through A's API Gateway. If not, give C the protected GCP HTTPS URLs and confirm Cognito JWT settings are configured.
 9. Give C the final endpoint URLs and this API contract.
@@ -502,7 +531,7 @@ Implemented now:
 - D1 schema and helper library.
 - D2 Q3/Q5/Q6 Lambda handlers.
 - D3 Q1/Q2 GCP handlers, CORS, and JWT verification.
-- D4 Q4 Lambda handler skeleton integrated with B's ML Lambda contract.
+- D4 Q4 Lambda handler integrated with B's Oracle tagging upload contract.
 - D5 SNS helper and notification Lambda.
 - D6.1 API documentation.
 - A API Gateway route handoff fragment.

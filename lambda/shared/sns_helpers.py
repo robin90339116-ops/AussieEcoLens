@@ -9,7 +9,7 @@ from aussie_ecolens_db import normalise_species, save_subscription, delete_subsc
 
 
 def sns_client():
-    return boto3.client("sns", region_name=os.getenv("AWS_REGION", "ap-southeast-2"))
+    return boto3.client("sns", region_name=os.getenv("AWS_REGION", "us-east-1"))
 
 
 def topic_arn() -> str:
