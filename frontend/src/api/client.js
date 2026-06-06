@@ -116,33 +116,6 @@ const fileToBase64 = (file) =>
     reader.readAsDataURL(file);
   });
 
-const subscriptionsKey = (userEmail) => `aussie-ecolens-subscriptions:${userEmail || 'current-user'}`;
-
-const readCachedSubscriptions = (userEmail) => {
-  if (typeof window === 'undefined') {
-    return [];
-  }
-  try {
-    const cached = window.localStorage.getItem(subscriptionsKey(userEmail));
-    const parsed = cached ? JSON.parse(cached) : [];
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-};
-
-const writeCachedSubscriptions = (userEmail, speciesList) => {
-  const next = [...new Set(speciesList)].filter(Boolean);
-  if (typeof window !== 'undefined') {
-    try {
-      window.localStorage.setItem(subscriptionsKey(userEmail), JSON.stringify(next));
-    } catch {
-      // UI cache is best effort; the API request above is the source of truth.
-    }
-  }
-  return next;
-};
-
 export const getErrorMessage = (error, fallback = 'Request failed') => {
   if (typeof error === 'string') {
     return error;
@@ -212,15 +185,14 @@ export const normalizeResults = (responsePayload) => {
   });
 };
 
-const checkDuplicateFile = async (file, fileHash) => {
+const checkDuplicateFile = async (checksum) => {
   if (!config.paths.checkDuplicate) {
     return null;
   }
 
   try {
     const { data } = await awsClient.post(config.paths.checkDuplicate, {
-      file_hash: fileHash,
-      checksum: fileHash
+      checksum
     });
     return unwrapResponsePayload(data);
   } catch (error) {
@@ -245,8 +217,8 @@ export async function requestPresignedUrl(file) {
   }
   ensureBaseUrl(config.awsApiBaseUrl, 'AWS');
 
-  const fileHash = await hashFile(file);
-  const duplicate = await checkDuplicateFile(file, fileHash);
+  const checksum = await hashFile(file);
+  const duplicate = await checkDuplicateFile(checksum);
   if (duplicate?.duplicate) {
     const existingFile = duplicate.existing_file || duplicate.existingFile;
     return {
@@ -259,11 +231,9 @@ export async function requestPresignedUrl(file) {
   }
 
   const { data } = await awsClient.post(config.paths.presigned, {
-    action: 'PUT',
     filename: file.name,
     content_type: file.type || 'application/octet-stream',
-    file_hash: fileHash,
-    checksum: fileHash
+    checksum
   });
   const payload = unwrapResponsePayload(data);
   return {
@@ -275,7 +245,8 @@ export async function requestPresignedUrl(file) {
       payload.presigned_url ||
       payload.url,
     key: payload.key || payload.file_key || payload.objectKey,
-    fileHash
+    uploadHeaders: payload.uploadHeaders || payload.upload_headers || {},
+    checksum
   };
 }
 
@@ -292,13 +263,14 @@ export async function requestDownloadUrl(s3UrlOrKey) {
   return payload.presigned_url || payload.presignedUrl || payload.url;
 }
 
-export async function uploadFileToS3(uploadUrl, file, onProgress) {
+export async function uploadFileToS3(uploadUrl, file, uploadHeaders = {}, onProgress) {
   if (config.useMocks || uploadUrl?.startsWith('mock://')) {
     return mockUploadFileToS3(uploadUrl, file, onProgress);
   }
   await axios.put(uploadUrl, file, {
     headers: {
-      'Content-Type': file.type || 'application/octet-stream'
+      'Content-Type': file.type || 'application/octet-stream',
+      ...(uploadHeaders || {})
     },
     onUploadProgress: (event) => {
       if (event.total) {
@@ -317,7 +289,8 @@ export async function pollUploadStatus({ key, file }) {
       id: key || file.name,
       type: file.type,
       original_url: key || file.name,
-      tags: {}
+      tags: {},
+      processing_pending: true
     };
   }
   ensureBaseUrl(config.awsApiBaseUrl, 'AWS');
@@ -367,6 +340,7 @@ export async function queryByUploadedFile(file) {
   ensureBaseUrl(config.awsApiBaseUrl, 'AWS');
   const { data } = await awsClient.post(config.paths.queryByFile, {
     image_base64: await fileToBase64(file),
+    filename: file.name,
     content_type: file.type || 'image/jpeg',
     limit: 50
   });
@@ -391,18 +365,10 @@ export async function deleteFiles(urls) {
     return mockDeleteFiles(urls);
   }
   ensureBaseUrl(config.awsApiBaseUrl, 'AWS');
-  const results = await Promise.all(
-    urls.map(async (url) => {
-      const { data } = await awsClient.delete(config.paths.deleteFiles, {
-        data: { url }
-      });
-      return unwrapResponsePayload(data);
-    })
-  );
-  return {
-    deleted: results.length,
-    results
-  };
+  const { data } = await awsClient.delete(config.paths.deleteFiles, {
+    data: { urls }
+  });
+  return unwrapResponsePayload(data);
 }
 
 export async function listFiles() {
@@ -421,7 +387,17 @@ export async function getSubscriptions(userEmail) {
   if (config.useMocks) {
     return mockGetSubscriptions();
   }
-  return readCachedSubscriptions(userEmail);
+  ensureBaseUrl(config.awsApiBaseUrl, 'AWS');
+  const { data } = await awsClient.get(config.paths.subscriptions, {
+    params: { email: userEmail }
+  });
+  const payload = unwrapResponsePayload(data);
+  const records = Array.isArray(payload?.subscriptions) ? payload.subscriptions : [];
+  return [
+    ...new Set(
+      records.flatMap((record) => record?.species_list || record?.species || [])
+    )
+  ].map((species) => String(species).replaceAll('_', ' '));
 }
 
 export async function saveSubscriptions(speciesList, userEmail) {
@@ -429,12 +405,16 @@ export async function saveSubscriptions(speciesList, userEmail) {
     return mockSaveSubscriptions(speciesList);
   }
   ensureBaseUrl(config.awsApiBaseUrl, 'AWS');
-  await awsClient.post(config.paths.subscriptions, {
+  const { data } = await awsClient.post(config.paths.subscriptions, {
     action: 'subscribe',
-    user_email: userEmail,
-    species_list: speciesList
+    email: userEmail,
+    species: speciesList
   });
-  return writeCachedSubscriptions(userEmail, speciesList);
+  const payload = unwrapResponsePayload(data);
+  const saved = payload?.subscription?.species_list || payload?.subscription?.species;
+  return (Array.isArray(saved) ? saved : speciesList).map((species) =>
+    String(species).replaceAll('_', ' ')
+  );
 }
 
 export async function unsubscribeSpecies(species, userEmail) {
@@ -442,11 +422,15 @@ export async function unsubscribeSpecies(species, userEmail) {
     return mockUnsubscribeSpecies(species);
   }
   ensureBaseUrl(config.awsApiBaseUrl, 'AWS');
-  await awsClient.post(config.paths.subscriptions, {
+  const { data } = await awsClient.post(config.paths.subscriptions, {
     action: 'unsubscribe',
-    user_email: userEmail,
-    species_list: [species]
+    email: userEmail,
+    species
   });
-  const remaining = readCachedSubscriptions(userEmail).filter((item) => item !== species);
-  return writeCachedSubscriptions(userEmail, remaining);
+  const payload = unwrapResponsePayload(data);
+  const remaining = payload?.local_subscription?.remaining;
+  if (Array.isArray(remaining)) {
+    return remaining.map((item) => String(item).replaceAll('_', ' '));
+  }
+  return getSubscriptions(userEmail);
 }

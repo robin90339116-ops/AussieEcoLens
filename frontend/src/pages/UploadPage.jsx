@@ -20,6 +20,7 @@ const statusIndex = {
   presign: 0,
   upload: 1,
   processing: 2,
+  queued: 2,
   complete: 3
 };
 
@@ -81,15 +82,20 @@ export default function UploadPage() {
       }
 
       setStatus('upload');
-      await uploadFileToS3(uploadUrl, file, setProgress);
+      await uploadFileToS3(uploadUrl, file, presigned.uploadHeaders, setProgress);
       setStatus('processing');
       const uploadResult = await pollUploadStatus({
         key: presigned.key || presigned.objectKey,
         file
       });
       setResult(normalizeResults({ items: [uploadResult] })[0] || uploadResult);
-      setStatus('complete');
-      message.success('Upload complete');
+      if (uploadResult?.processing_pending) {
+        setStatus('queued');
+        message.info('Upload complete. Recognition is processing in the background.');
+      } else {
+        setStatus('complete');
+        message.success('Upload complete');
+      }
     } catch (uploadError) {
       setError(getErrorMessage(uploadError, 'Upload failed'));
       setStatus('idle');
@@ -126,7 +132,7 @@ export default function UploadPage() {
             type="primary"
             icon={<UploadCloud size={17} />}
             disabled={!validFile || status !== 'idle'}
-            loading={status !== 'idle' && status !== 'complete'}
+            loading={['presign', 'upload', 'processing'].includes(status)}
             onClick={handleUpload}
           >
             Start upload
@@ -144,7 +150,7 @@ export default function UploadPage() {
           items={[
             { title: 'URL' },
             { title: 'Upload' },
-            { title: 'Recognition' },
+            { title: status === 'queued' ? 'Recognition queued' : 'Recognition' },
             { title: 'Done' }
           ]}
         />
@@ -172,6 +178,7 @@ export default function UploadPage() {
               </Descriptions.Item>
             </Descriptions>
             <Space wrap>
+              {result.processing_pending && <Tag color="gold">Processing</Tag>}
               {Object.entries(result.tags || {}).map(([species, count]) => (
                 <Tag key={species} color="green">
                   {species} x {count}

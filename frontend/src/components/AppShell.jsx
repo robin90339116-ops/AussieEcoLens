@@ -58,11 +58,11 @@ export default function AppShell() {
           <Typography.Text className="user-email">{user?.email}</Typography.Text>
           <Button
             title="Sign out"
+            aria-label="Sign out"
+            className="sign-out-button"
             icon={<LogOut size={16} />}
             onClick={handleLogout}
-          >
-            Sign out
-          </Button>
+          />
         </Space>
       </Header>
       <Content className="app-content">
@@ -71,4 +71,3 @@ export default function AppShell() {
     </Layout>
   );
 }
-

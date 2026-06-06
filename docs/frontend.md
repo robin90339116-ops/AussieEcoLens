@@ -49,18 +49,27 @@ The API client accepts common response shapes used during integration:
 
 - Presigned upload responses can return `uploadUrl`, `upload_url`, `url`,
   `presignedUrl`, or `presigned_url`.
-- Duplicate upload checks send a SHA-256 `file_hash` and `checksum` to `/upload/check-dup`.
+- Presigned upload requests include the SHA-256 `checksum`. Responses can include
+  `upload_headers`; the frontend must send those headers unchanged with the S3 `PUT`
+  because they are part of the SigV4 signature.
+- Duplicate upload checks send the canonical SHA-256 `checksum` field to `/upload/check-dup`.
+  A's Lambda still accepts legacy `file_hash`, but the frontend no longer uses it.
 - Result lists can be returned as `items`, `results`, `files`, or a raw array.
 - Single ML metadata records from B are also accepted, including `file_id`, `file_type`,
   `original_url`, `thumbnail_url`, `tags`, and `predictions`.
-- Q4 sends uploaded query images to D's API Gateway route as JSON with `image_base64`, `content_type`, and `limit`.
+- Q4 sends uploaded query images to D's API Gateway route as JSON with
+  `image_base64`, `filename`, `content_type`, and `limit`.
 - Gallery records can include `thumbnail_url`, `thumbnailUrl`, `url`, `original_url`, `originalUrl`, `type`, and `tags`.
 - Q3 full-size lookup can return `original_url`, `originalUrl`, `fullUrl`, or `url`.
-- Q6 deletes each selected file with `DELETE /files` and body `{ "url": "<original_or_thumbnail_url>" }`.
-- Notifications use `POST /notifications/subscribe` with `action`, `user_email`, and `species_list`.
-  D does not currently expose a GET subscription-list endpoint, so the UI keeps a browser-local cache only for display.
+- Q6 sends one bulk `DELETE /files` request with body `{ "urls": ["<url>", "..."] }`.
+- Notifications use `POST /notifications/subscribe` with `action`, `email`, and `species`.
+  D also supports `GET /notifications/subscribe?email=<user>` for loading the current subscription list.
 
 All authenticated API calls attach `Authorization: Bearer <token>` using Amplify's current Cognito session.
+
+The S3-triggered thumbnail, ML, and database pipeline is asynchronous. Until the team
+provides an upload-status endpoint, the upload page reports recognition as queued instead
+of claiming that tags are already available.
 
 ## Build
 

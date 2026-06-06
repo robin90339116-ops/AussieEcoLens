@@ -34,11 +34,16 @@ Ruitong's 2026-06-03 package confirms the API Gateway resource tree, but also st
 
 Ruitong's branch adds Lambda code for presigned upload and duplicate checking:
 
-- `POST /upload/check-dup` is live on prod and sends `{ "file_hash": "<sha256>", "checksum": "<sha256>" }`.
+- `POST /upload/check-dup` is live on prod and sends `{ "checksum": "<sha256>" }`.
+  A's Lambda also accepts the legacy `file_hash` field for compatibility.
 - Duplicate response uses HTTP `409` with `{ "duplicate": true, "message": "...", "existing_file": "<url>" }`.
 - Non-duplicate response uses HTTP `200` with `{ "duplicate": false }`.
-- `POST /upload/presigned` is live on prod and sends `{ "action": "PUT", "filename": "...", "content_type": "...", "file_hash": "<sha256>", "checksum": "<sha256>" }`.
+- `POST /upload/presigned` is live on prod and sends
+  `{ "filename": "...", "content_type": "...", "checksum": "<sha256>" }`.
 - Presigned upload response is `{ "upload_url": "...", "file_key": "...", "bucket": "aussie-ecolens-35346906" }`.
+- The response may also include
+  `{ "upload_headers": { "x-amz-meta-owner-id": "<cognito owner>" } }`.
+  These headers are signed and must be included unchanged in the direct S3 `PUT`.
 - The same presigned Lambda can generate read URLs with `{ "action": "GET", "s3_url": "..." }` or `{ "action": "GET", "file_key": "..." }`, returning `{ "presigned_url": "..." }`.
 - The frontend computes SHA-256 in the browser before requesting the upload URL, then uploads the file to S3 using `PUT`.
 - Ruitong's S3 CORS config currently allows `http://localhost:3000`, so the Vite dev server is configured to use port `3000` for local integration.
@@ -59,17 +64,26 @@ Wenxuan's branch confirms the B module metadata shape. The frontend now accepts 
 These methods and body shapes were read from `origin/Lianjun-Zhang`:
 
 - API Gateway deployment: upload endpoints are confirmed on A's prod stage; confirm whether Q3/Q4/Q5/Q6 and notifications are now deployed there.
-- Presigned upload: A's Lambda currently expects `POST` with `filename`, `content_type`, and optional SHA-256 `file_hash`/`checksum`; response includes `upload_url`, `file_key`, and `bucket`.
-- Duplicate check: A's Lambda currently expects `POST /upload/check-dup` with a SHA-256 `file_hash`/`checksum`.
-- Upload status/result: Ruitong's resource tree has no status endpoint yet. If A adds one, set `VITE_UPLOAD_STATUS_PATH`; otherwise the frontend completes upload with basic file metadata.
+- Presigned upload: A's Lambda expects `POST` with `filename`, `content_type`, and
+  SHA-256 `checksum`; response includes `upload_url`, `file_key`, `bucket`, and
+  optional signed `upload_headers`.
+- Duplicate check: A's Lambda expects `POST /upload/check-dup` with the SHA-256 `checksum` field; legacy `file_hash` is also accepted.
+- Upload status/result: Ruitong's resource tree has no status endpoint yet. If A adds one,
+  set `VITE_UPLOAD_STATUS_PATH`; otherwise the frontend reports recognition as queued.
 - Q1 tag count query: D's GCP handler expects `POST` JSON `{ tags: { species: count }, limit }` and returns `items`.
 - Q2 species query: D's GCP handler expects `POST` JSON `{ species, limit }` or query params and returns `items`.
 - Q3 thumbnail lookup: D's AWS Lambda expects `POST` JSON `{ thumbnail_url }` and returns `original_url`, `thumbnail_url`, `tags`, and `type`.
-- Q4 uploaded-file query: D's AWS Lambda expects `POST` JSON `{ image_base64, content_type, limit }` or `{ image_url, limit }`; it calls B's ML Lambda and does not store the query image.
+- Q4 uploaded-file query: D's AWS Lambda expects `POST` JSON
+  `{ image_base64, filename, content_type, limit }` or `{ image_url, limit }`;
+  it calls B's ML service and does not store the query image.
 - Q5 bulk tag edit: D's AWS Lambda expects `POST` JSON `{ urls, tags, operation }` with `operation` as `add/1` or `remove/0`.
-- Q6 delete files: D's AWS Lambda expects `DELETE` JSON `{ file_id }` or `{ url }`. The frontend sends one `DELETE` per selected URL.
+- Q6 delete files: D's AWS Lambda accepts bulk `DELETE` JSON `{ urls: [...] }`
+  or `{ file_ids: [...] }`. The frontend sends one bulk request for all selected URLs.
 - File listing: D's branch does not include a GET list endpoint. The frontend leaves `VITE_LIST_FILES_PATH` empty unless A/D add one.
-- Subscriptions: D's AWS Lambda expects `POST` JSON `{ action: "subscribe" | "unsubscribe", user_email, species_list }`. It does not expose a GET subscription-list endpoint.
+- Subscriptions: D's AWS Lambda supports `GET ?email=<user>` for listing and `POST` actions for subscribe/unsubscribe.
+  A must attach both GET and POST methods to the agreed API Gateway path.
+- Path coordination: A pre-created `/notifications/subscribe`, while D's latest OpenAPI fragment uses `/notifications`.
+  The frontend currently targets A's `/notifications/subscribe`; A and D must deploy one agreed path before the demo.
 
 ## Demo Smoke Test
 
