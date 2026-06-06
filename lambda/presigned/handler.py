@@ -71,16 +71,26 @@ def lambda_handler(event, context):
         if custom_prefix:
             prefix = custom_prefix
 
-        unique_name = f"{uuid.uuid4().hex}_{filename}"
+        file_hash = body.get('file_hash') or body.get('checksum')
+        unique_name = f"{file_hash}_{filename}" if file_hash else f"{uuid.uuid4().hex}_{filename}"
         file_key = f"{prefix}/{unique_name}"
+
+        claims = event.get('requestContext', {}).get('authorizer', {}).get('claims', {}) or {}
+        owner_id = claims.get('sub') or claims.get('email')
+
+        params = {
+            'Bucket': BUCKET,
+            'Key': file_key,
+            'ContentType': content_type
+        }
+        upload_headers = {}
+        if owner_id:
+            params['Metadata'] = {'owner-id': owner_id}
+            upload_headers['x-amz-meta-owner-id'] = owner_id
 
         presigned_url = s3_client.generate_presigned_url(
             'put_object',
-            Params={
-                'Bucket': BUCKET,
-                'Key': file_key,
-                'ContentType': content_type
-            },
+            Params=params,
             ExpiresIn=3600
         )
 
@@ -90,7 +100,8 @@ def lambda_handler(event, context):
             'body': json.dumps({
                 'upload_url': presigned_url,
                 'file_key': file_key,
-                'bucket': BUCKET
+                'bucket': BUCKET,
+                'upload_headers': upload_headers
             })
         }
         
