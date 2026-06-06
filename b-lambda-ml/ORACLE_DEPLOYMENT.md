@@ -17,17 +17,38 @@ triggered by the S3 ObjectCreated event; it then forwards the work to the OCI se
 ```mermaid
 flowchart LR
     user["User / React UI"] -->|"Cognito auth"| cognito["AWS Cognito"]
-    user -->|"presigned upload"| s3["AWS S3 Upload Bucket"]
-    s3 -->|"ObjectCreated event"| trigger["AWS Lambda (s3_trigger_lambda)"]
+    user -->|"presigned upload (x-amz-meta-owner-id)"| s3["AWS S3 Upload Bucket"]
+    s3 -->|"ObjectCreated event (single target)"| trigger["AWS Lambda (s3_trigger_lambda)"]
+    trigger -->|"async invoke (Event)"| thumb["AWS Lambda (thumbnail_lambda)"]
+    thumb -->|"PUT thumbnail"| s3
     trigger -->|"presigned GET URL + bearer token (HTTPS)"| oci["OCI ML Service (FastAPI + PyTorch)"]
     oci -->|"download image via presigned URL"| s3
-    oci -->|"metadata JSON"| dbapi["GCP / D module DB + query API"]
-    dbapi --> results["Query results -> UI"]
+    oci -->|"metadata JSON (incl. SHA-256 checksum)"| trigger
+    trigger -->|"write_record()"| ddb["DynamoDB AussieEcoLensFiles"]
+    trigger -.->|"optional publish (tags)"| notify["D notifications Lambda -> SNS"]
+    ddb --> results["D query API -> UI"]
 ```
 
-- AWS: Cognito (auth), S3 (storage), API Gateway, lightweight trigger Lambda.
+- AWS: Cognito (auth), S3 (storage), API Gateway, the forwarding trigger Lambda, the
+  thumbnail Lambda, DynamoDB, and D's notification/query Lambdas.
 - Oracle (this instance): heavy ML inference service.
-- GCP: database + query/notification functions (D module).
+- GCP: D's query/notification functions can also run here against the same DynamoDB.
+
+### Why the trigger Lambda fans out (S3 single-target limitation)
+
+S3 allows only **one** notification target per bucket/event/prefix. So the thumbnail
+Lambda and the ML forwarding Lambda cannot both be attached directly to `uploads/`.
+The "doorbell" on `uploads/` is therefore the forwarding Lambda only; it asynchronously
+invokes the thumbnail Lambda (`InvocationType="Event"`) and then calls the OCI service.
+
+### Why the trigger Lambda writes to DynamoDB
+
+The S3-triggered invocation is asynchronous: nothing consumes its return value, so ML
+results were previously lost and the database stayed empty. The forwarding Lambda now
+persists the OCI metadata with D's shared `aussie_ecolens_db.write_record` immediately
+after a successful inference. The thumbnail URL is deterministic
+(`thumbnails/<stem>.jpg`), so the record is complete even though the thumbnail is
+generated asynchronously.
 
 ## Components
 
@@ -92,20 +113,66 @@ API_AUTH_TOKEN=test-token-123 uvicorn ml_service:app --host 0.0.0.0 --port 8080
 - Prefer placing the service behind an OCI Load Balancer with TLS, exposing only 443.
 - Lock the source to the AWS Lambda egress (NAT gateway IP) where possible.
 
-## AWS trigger Lambda configuration
+## AWS trigger / forwarding Lambda configuration
 
 Environment variables:
 
 ```text
-OCI_ML_ENDPOINT=https://<oci-host>/v1/tag/s3
-OCI_API_TOKEN=<same value as API_AUTH_TOKEN on OCI>
+OCI_ML_ENDPOINT=https://<oci-host>:8080/v1/tag/s3
+OCI_API_TOKEN=<same value as API_AUTH_TOKEN on OCI>   # send this to A privately
 PRESIGN_EXPIRY=600
 REQUEST_TIMEOUT=300
+
+# Fan-out: async thumbnail generation (S3 single-target workaround)
+THUMBNAIL_LAMBDA_NAME=aussie-ecolens-thumbnail        # name/ARN of thumbnail Lambda
+THUMBNAIL_PREFIX=thumbnails/
+
+# Persistence to DynamoDB (uses D's shared module)
+PERSIST_TO_DB=true
+DEFAULT_OWNER_ID=demo-owner                            # fallback when object has no owner
+OWNER_METADATA_KEY=owner-id                            # S3 user-metadata key A sets on upload
+FILES_TABLE=AussieEcoLensFiles                         # read by aussie_ecolens_db
+AWS_REGION=us-east-1                                    # MUST match the team's region
+
+# Optional: trigger D's tag-based notification (no DynamoDB Stream exists)
+NOTIFY_LAMBDA_NAME=aussie-ecolens-notifications
 ```
 
-IAM permissions: `s3:GetObject` on the upload bucket (to create presigned URLs) and outbound
-network access. This Lambda is tiny (only boto3 + stdlib), so a normal zip package works and
-avoids the AWS Academy container limitations entirely.
+Packaging: the deployment zip must include D's `lambda/shared/aussie_ecolens_db.py`
+(and boto3) so `write_record` / `get_by_checksum` are importable. Example:
+
+```bash
+mkdir -p build && cp s3_trigger_lambda.py build/
+cp ../path-to-D/lambda/shared/aussie_ecolens_db.py build/
+cd build && zip -r ../trigger.zip . && cd ..
+```
+
+IAM permissions for this Lambda:
+
+- `s3:GetObject`, `s3:HeadObject` on the upload bucket (presigned URLs + owner metadata).
+- `lambda:InvokeFunction` on the thumbnail Lambda (and notifications Lambda if used).
+- `dynamodb:PutItem` and `dynamodb:Query` (checksum-index) on `AussieEcoLensFiles`.
+- Outbound network access to the OCI endpoint.
+
+This Lambda is still tiny (boto3 + stdlib + D's db helper), so a normal zip package works
+and avoids the AWS Academy container limitations entirely.
+
+## Cross-team coordination notes (B module)
+
+These were raised in the team tech-coordination doc and are addressed here:
+
+1. **owner_id** is not in the S3 event. Convention agreed with D: A attaches the Cognito
+   `sub` as S3 user metadata `x-amz-meta-owner-id` on the presigned PUT; B reads it via
+   `head_object` and falls back to `DEFAULT_OWNER_ID`. D's `write_record` applies its own
+   `DEFAULT_OWNER_ID` fallback as a final safety net.
+2. **One S3 notification target**: configure the bucket `uploads/` event to invoke ONLY the
+   forwarding Lambda. It fans out to the thumbnail Lambda. A configures the bucket once this
+   is agreed.
+3. **OCI token**: send `API_AUTH_TOKEN` (= `OCI_API_TOKEN`) to A privately so A can set it on
+   the forwarding Lambda. Never commit it; never expose it to the frontend.
+4. **Dedup checksum**: the OCI service now returns the SHA-256 of the stored bytes, matching
+   the frontend's `crypto.subtle.digest('SHA-256', ...)`. The forwarding Lambda calls
+   `get_by_checksum` before writing to avoid duplicate rows.
 
 ## Verified locally on this OCI instance
 

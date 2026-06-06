@@ -43,6 +43,7 @@ from ecolens_core import (
     load_md_detector,
     load_species_model,
     public_s3_url,
+    sha256_file,
     tag_image,
     tag_video,
 )
@@ -180,6 +181,11 @@ def tag_s3(payload: dict[str, Any]) -> JSONResponse:
         except Exception as exc:
             return JSONResponse(status_code=502, content=error_response("DownloadFailed", str(exc), bucket, key))
 
+        # Compute the SHA-256 checksum over the exact bytes stored in S3 so it
+        # matches the frontend's SHA-256 (used for cross-module de-duplication).
+        # A caller-provided checksum (if any) takes precedence.
+        checksum = payload.get("checksum") or sha256_file(local_path)
+
         try:
             ml_result = _run_inference(local_path, tmp_dir / "work")
         except Exception as exc:
@@ -190,7 +196,7 @@ def tag_s3(payload: dict[str, Any]) -> JSONResponse:
             key=key,
             tags=ml_result["tags"],
             predictions=ml_result["predictions"],
-            checksum=payload.get("checksum"),
+            checksum=checksum,
             original_url=payload.get("original_url"),
             thumbnail_url=_thumbnail_url_for(bucket, key, payload.get("thumbnail_url")),
         )
@@ -224,6 +230,7 @@ async def tag_upload(file: UploadFile = File(...), persist: bool = Form(default=
         tmp_dir = Path(tmp)
         local_path = tmp_dir / Path(filename).name
         local_path.write_bytes(await file.read())
+        checksum = sha256_file(local_path)
         try:
             ml_result = _run_inference(local_path, tmp_dir / "work")
         except Exception as exc:
@@ -233,6 +240,7 @@ async def tag_upload(file: UploadFile = File(...), persist: bool = Form(default=
         content={
             "status": "ok",
             "file_type": file_type,
+            "checksum": checksum,
             "tags": ml_result["tags"],
             "predictions": ml_result["predictions"],
         }

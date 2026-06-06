@@ -4,10 +4,20 @@ This document defines the interface for the Lambda + ML module owned by ZHU WENX
 It is intended for integration with the authentication/API, frontend, database, and
 notification modules.
 
+## Upload pipeline (Route B)
+
+The S3 `uploads/` event has a **single** notification target: the forwarding Lambda
+(`s3_trigger_lambda.py`). It fans out the work itself:
+
+1. async-invokes the thumbnail Lambda (`InvocationType="Event"`),
+2. calls the OCI ML service (`/v1/tag/s3`) with a presigned URL + bearer token,
+3. persists the returned metadata to DynamoDB via D's `aussie_ecolens_db.write_record`,
+4. optionally publishes a tag-based notification through D's notifications Lambda.
+
 ## S3 Event Input
 
-The thumbnail and ML tagging Lambdas both accept standard S3 `ObjectCreated` events.
-For local testing, they also accept a simplified event:
+The thumbnail and ML Lambdas accept standard S3 `ObjectCreated` events. For local
+testing, they also accept a simplified event:
 
 ```json
 {
@@ -17,6 +27,10 @@ For local testing, they also accept a simplified event:
   "original_url": "https://example-bucket.s3.amazonaws.com/uploads/example.jpg"
 }
 ```
+
+`owner_id` is not present in the S3 event. By convention A sets it as S3 user metadata
+`x-amz-meta-owner-id` (Cognito `sub`) on the presigned PUT; the forwarding Lambda reads it
+via `head_object` and falls back to `DEFAULT_OWNER_ID`.
 
 ## Thumbnail Lambda Output
 
@@ -36,9 +50,11 @@ For local testing, they also accept a simplified event:
 
 ## ML Tagging Lambda Output
 
-The ML Lambda returns a metadata payload ready for database insertion by the D module.
-The `tags` object uses common species names where available and stores counts, not only
-single labels.
+The OCI ML service (and the legacy ML Lambda) returns a metadata payload that the
+forwarding Lambda persists via D's `write_record`. The `checksum` field is the SHA-256
+of the stored bytes (matches the frontend's SHA-256 for de-duplication). The `tags`
+object uses common species names where available and stores counts, not only single
+labels.
 
 ```json
 {
@@ -82,9 +98,12 @@ Handlers should return structured errors instead of crashing during the demo.
 ## Ownership Boundaries
 
 - A module provides the upload bucket, object key pattern, authentication, API Gateway,
-  presigned URLs, and Lambda execution roles.
-- B module generates thumbnails, runs ML inference, packages the container image, and
-  returns the metadata JSON shown above.
+  presigned URLs (setting `x-amz-meta-owner-id`), Lambda execution roles, and configures the
+  bucket so the single `uploads/` notification points at B's forwarding Lambda.
+- B module runs the forwarding Lambda (fan-out + presign + bearer auth), generates
+  thumbnails, runs ML inference on OCI, computes the SHA-256 checksum, and **persists the
+  metadata to DynamoDB via D's `aussie_ecolens_db.write_record`** after a successful call.
 - C module uses `thumbnail_url`, `original_url`, and `tags` for UI preview and result display.
-- D module persists the metadata record, supports query APIs, and triggers tag-based
-  notifications after successful database insertion.
+- D module owns the DynamoDB schema + shared `aussie_ecolens_db` module, the query APIs, and
+  the notifications Lambda. Because the table has no DynamoDB Stream, B explicitly invokes D's
+  notification `publish` (when `NOTIFY_LAMBDA_NAME` is set) after persisting a tagged file.
