@@ -69,6 +69,13 @@ def lambda_handler(event, context):
             }
 
         if custom_prefix:
+            allowed_prefixes = {'uploads/images', 'uploads/videos', 'temp'}
+            if custom_prefix.strip('/') not in allowed_prefixes:
+                return {
+                    'statusCode': 400,
+                    'headers': cors_headers,
+                    'body': json.dumps({'error': 'prefix not allowed'})
+                }
             prefix = custom_prefix
 
         file_hash = body.get('file_hash') or body.get('checksum')
