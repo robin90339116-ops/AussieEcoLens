@@ -45,6 +45,9 @@ Ruitong's branch adds Lambda code for presigned upload and duplicate checking:
   `{ "upload_headers": { "x-amz-meta-owner-id": "<cognito owner>" } }`.
   These headers are signed and must be included unchanged in the direct S3 `PUT`.
 - The same presigned Lambda can generate read URLs with `{ "action": "GET", "s3_url": "..." }` or `{ "action": "GET", "file_key": "..." }`, returning `{ "presigned_url": "..." }`.
+- Query responses may contain private S3 keys or raw object URLs. The frontend extracts
+  the object key, requests a short-lived GET URL from this Lambda for display, and keeps
+  the raw reference for later Q3/Q5/Q6 requests.
 - The frontend computes SHA-256 in the browser before requesting the upload URL, then uploads the file to S3 using `PUT`.
 - Ruitong's S3 CORS config currently allows `http://localhost:3000`, so the Vite dev server is configured to use port `3000` for local integration.
 
@@ -91,12 +94,15 @@ These methods and body shapes were read from `origin/Lianjun-Zhang`:
 2. Run `npm run build`.
 3. Start `npm run dev` or open the deployed URL.
 4. Register a new user, verify email, sign in, and sign out.
-5. Confirm protected routes redirect unauthenticated users to `/login`.
-6. Upload one image and verify progress, upload success, thumbnail, and tags.
+5. Confirm protected routes redirect unauthenticated users to `/signup`.
+6. Upload one image and verify progress and the uploaded-image preview. If no status
+   endpoint is deployed, confirm the page says `Recognition queued`; otherwise also
+   verify the generated thumbnail and tags.
 7. Run Q1 with two species/count rows and confirm AND semantics.
 8. Run Q2 for one species.
 9. Run Q4 with a query image and confirm the query image is not stored.
-10. Click a thumbnail and confirm Q3 returns the full-size image URL.
+10. Run Q3 from the thumbnail URL tab, then click a result thumbnail and confirm the
+    full-size image opens.
 11. Add and remove a tag for multiple URLs.
 12. Delete a file and confirm it disappears from the UI.
 13. Subscribe and unsubscribe from one species.

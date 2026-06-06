@@ -1,7 +1,6 @@
 import { Amplify } from 'aws-amplify';
 
 const env = import.meta.env;
-const mockFlag = env.VITE_USE_MOCKS;
 
 export const config = {
   awsRegion: env.VITE_AWS_REGION || 'us-east-1',
@@ -9,7 +8,6 @@ export const config = {
   cognitoClientId: env.VITE_COGNITO_CLIENT_ID || '',
   awsApiBaseUrl: env.VITE_AWS_API_BASE_URL || '',
   gcpApiBaseUrl: env.VITE_GCP_API_BASE_URL || '',
-  useMocks: mockFlag === 'true',
   paths: {
     presigned: env.VITE_PRESIGNED_PATH || '/upload/presigned',
     checkDuplicate: env.VITE_UPLOAD_CHECK_DUP_PATH || '/upload/check-dup',

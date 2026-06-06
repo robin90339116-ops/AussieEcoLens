@@ -9,11 +9,9 @@ import {
   signOut,
   signUp
 } from 'aws-amplify/auth';
-import { authConfigured, config } from '../config';
+import { authConfigured } from '../config';
 
 const AuthContext = createContext(null);
-
-const MOCK_USER_KEY = 'aussie-ecolens-mock-user';
 
 const getTokenPayload = async () => {
   const session = await fetchAuthSession();
@@ -21,7 +19,6 @@ const getTokenPayload = async () => {
 };
 
 export function AuthProvider({ children }) {
-  const mockAuth = config.useMocks;
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [pendingUsername, setPendingUsername] = useState('');
@@ -29,12 +26,6 @@ export function AuthProvider({ children }) {
   const refreshUser = useCallback(async () => {
     setLoading(true);
     try {
-      if (mockAuth) {
-        const stored = localStorage.getItem(MOCK_USER_KEY);
-        setUser(stored ? JSON.parse(stored) : null);
-        return;
-      }
-
       const current = await getCurrentUser();
       const payload = await getTokenPayload();
       setUser({
@@ -48,7 +39,7 @@ export function AuthProvider({ children }) {
     } finally {
       setLoading(false);
     }
-  }, [mockAuth]);
+  }, []);
 
   useEffect(() => {
     refreshUser();
@@ -56,18 +47,6 @@ export function AuthProvider({ children }) {
 
   const login = useCallback(
     async ({ email, password }) => {
-      if (mockAuth) {
-        const mockUser = {
-          username: email,
-          email,
-          givenName: 'Chenhuan',
-          familyName: 'Wang'
-        };
-        localStorage.setItem(MOCK_USER_KEY, JSON.stringify(mockUser));
-        setUser(mockUser);
-        return { isSignedIn: true, nextStep: { signInStep: 'DONE' } };
-      }
-
       const result = await signIn({ username: email, password });
       setPendingUsername(email);
       if (result.isSignedIn) {
@@ -75,16 +54,11 @@ export function AuthProvider({ children }) {
       }
       return result;
     },
-    [mockAuth, refreshUser]
+    [refreshUser]
   );
 
   const register = useCallback(
     async ({ email, password, givenName, familyName }) => {
-      if (mockAuth) {
-        setPendingUsername(email);
-        return { nextStep: { signUpStep: 'CONFIRM_SIGN_UP' } };
-      }
-
       setPendingUsername(email);
       return signUp({
         username: email,
@@ -98,59 +72,36 @@ export function AuthProvider({ children }) {
         }
       });
     },
-    [mockAuth]
+    []
   );
 
   const verifyEmail = useCallback(
-    async ({ email, code }) => {
-      if (mockAuth) {
-        return { isSignUpComplete: true };
-      }
-      return confirmSignUp({ username: email, confirmationCode: code });
-    },
-    [mockAuth]
+    async ({ email, code }) => confirmSignUp({ username: email, confirmationCode: code }),
+    []
   );
 
-  const resendCode = useCallback(
-    async (email) => {
-      if (mockAuth) {
-        return true;
-      }
-      return resendSignUpCode({ username: email });
-    },
-    [mockAuth]
-  );
+  const resendCode = useCallback(async (email) => resendSignUpCode({ username: email }), []);
 
   const completeNewPassword = useCallback(
     async (newPassword) => {
-      if (mockAuth) {
-        await refreshUser();
-        return { isSignedIn: true };
-      }
       const result = await confirmSignIn({ challengeResponse: newPassword });
       if (result.isSignedIn) {
         await refreshUser();
       }
       return result;
     },
-    [mockAuth, refreshUser]
+    [refreshUser]
   );
 
   const logout = useCallback(async () => {
-    if (mockAuth) {
-      localStorage.removeItem(MOCK_USER_KEY);
-      setUser(null);
-      return;
-    }
     await signOut();
     setUser(null);
-  }, [mockAuth]);
+  }, []);
 
   const value = useMemo(
     () => ({
       user,
       loading,
-      mockAuth,
       pendingUsername,
       login,
       register,
@@ -163,7 +114,6 @@ export function AuthProvider({ children }) {
     [
       user,
       loading,
-      mockAuth,
       pendingUsername,
       login,
       register,

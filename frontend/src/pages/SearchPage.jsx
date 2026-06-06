@@ -1,6 +1,7 @@
 import {
   Button,
   Form,
+  Input,
   InputNumber,
   Select,
   Space,
@@ -16,6 +17,7 @@ import {
   getErrorMessage,
   queryBySpecies,
   queryByTags,
+  queryByThumbnailUrl,
   queryByUploadedFile,
   tagsArrayToObject
 } from '../api/client';
@@ -76,11 +78,23 @@ export default function SearchPage() {
     }
   };
 
+  const handleThumbnailQuery = async ({ thumbnailUrl }) => {
+    setLoading(true);
+    try {
+      const items = await queryByThumbnailUrl(thumbnailUrl.trim());
+      goToResults('Thumbnail URL lookup', items);
+    } catch (error) {
+      message.error(getErrorMessage(error, 'Thumbnail lookup failed'));
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <section className="page-grid single-column">
       <div className="page-heading">
         <Typography.Title level={2}>Search media</Typography.Title>
-        <Typography.Text type="secondary">Find stored media by tag counts, species, or a query image.</Typography.Text>
+        <Typography.Text type="secondary">Find stored media by tags, species, thumbnail URL, or a query image.</Typography.Text>
       </div>
 
       <div className="tool-panel">
@@ -99,8 +113,8 @@ export default function SearchPage() {
                   <Form.List name="rows">
                     {(fields, { add, remove }) => (
                       <>
-                        {fields.map((field) => (
-                          <div className="query-row" key={field.key}>
+                        {fields.map(({ key, ...field }) => (
+                          <div className="query-row" key={key}>
                             <Form.Item
                               {...field}
                               name={[field.name, 'species']}
@@ -164,6 +178,31 @@ export default function SearchPage() {
                   </Form.Item>
                   <Button type="primary" htmlType="submit" loading={loading} icon={<Search size={17} />}>
                     Search species
+                  </Button>
+                </Form>
+              )
+            },
+            {
+              key: 'thumbnail',
+              label: 'Thumbnail URL',
+              children: (
+                <Form
+                  layout="vertical"
+                  onFinish={handleThumbnailQuery}
+                  className="thumbnail-query-form"
+                >
+                  <Form.Item
+                    name="thumbnailUrl"
+                    label="Thumbnail URL"
+                    rules={[
+                      { required: true, message: 'Enter a thumbnail URL' },
+                      { type: 'url', message: 'Enter a valid URL' }
+                    ]}
+                  >
+                    <Input placeholder="https://.../thumbnails/example.jpg" />
+                  </Form.Item>
+                  <Button type="primary" htmlType="submit" loading={loading} icon={<Search size={17} />}>
+                    Find original
                   </Button>
                 </Form>
               )

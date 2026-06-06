@@ -1,4 +1,4 @@
-import { Layout, Menu, Space, Typography, Button, Tag } from 'antd';
+import { Layout, Menu, Space, Typography, Button } from 'antd';
 import {
   Bell,
   LogOut,
@@ -23,7 +23,7 @@ const navItems = [
 export default function AppShell() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, logout, mockAuth } = useAuth();
+  const { user, logout } = useAuth();
   const selectedKey =
     navItems.find((item) => location.pathname.startsWith(item.key))?.key || '/upload';
 
@@ -54,7 +54,6 @@ export default function AppShell() {
         />
 
         <Space className="user-cluster">
-          {mockAuth && <Tag color="gold">Mock</Tag>}
           <Typography.Text className="user-email">{user?.email}</Typography.Text>
           <Button
             title="Sign out"

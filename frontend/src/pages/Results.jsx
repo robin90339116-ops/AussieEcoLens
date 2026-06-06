@@ -27,14 +27,20 @@ export default function Results() {
   }, [location.state]);
 
   const handleOpenImage = async (item) => {
-    const thumbnailUrl = item.thumbnail_url || item.url || item.original_url;
-    if (!thumbnailUrl) {
+    const thumbnailReference =
+      item.thumbnail_s3_key ||
+      item.thumbnail_storage_url ||
+      item.thumbnail_url ||
+      item.url ||
+      item.original_storage_url ||
+      item.original_url;
+    if (!thumbnailReference) {
       message.error('No preview URL is available for this result');
       return;
     }
-    setLoadingUrl(thumbnailUrl);
+    setLoadingUrl(item.id || thumbnailReference);
     try {
-      const originalUrl = await resolveOriginalUrl(thumbnailUrl);
+      const originalUrl = await resolveOriginalUrl(thumbnailReference);
       setModalUrl(originalUrl);
     } catch (error) {
       message.error(getErrorMessage(error, 'Could not resolve original URL'));
@@ -60,6 +66,12 @@ export default function Results() {
             const isVideo = item.type === 'video';
             const previewUrl = item.thumbnail_url || item.url || item.original_url;
             const originalUrl = item.original_url || item.url;
+            const storageUrl =
+              item.thumbnail_storage_url ||
+              item.original_storage_url ||
+              item.thumbnail_s3_key ||
+              item.original_s3_key ||
+              previewUrl;
 
             return (
               <article className="media-card" key={item.id || previewUrl}>
@@ -100,7 +112,7 @@ export default function Results() {
                       </Button>
                     ) : !isVideo && previewUrl ? (
                       <Button
-                        loading={loadingUrl === previewUrl}
+                        loading={loadingUrl === (item.id || previewUrl)}
                         icon={<Eye size={16} />}
                         onClick={() => handleOpenImage(item)}
                       >
@@ -110,7 +122,7 @@ export default function Results() {
                       <Typography.Text type="secondary">No media URL</Typography.Text>
                     )}
                     <Typography.Text copyable ellipsis className="copy-url">
-                      {previewUrl || item.original_key || item.file_id || 'No media URL'}
+                      {storageUrl || item.original_key || item.file_id || 'No media URL'}
                     </Typography.Text>
                   </Space>
                 </div>

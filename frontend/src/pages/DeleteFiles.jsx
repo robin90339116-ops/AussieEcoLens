@@ -1,7 +1,7 @@
 import { Button, Empty, Form, Input, Modal, Space, Table, Tag, Typography, message } from 'antd';
 import { RefreshCw, Trash2 } from 'lucide-react';
 import { useMemo, useState } from 'react';
-import { deleteFiles, getErrorMessage, listFiles } from '../api/client';
+import { deleteFiles, getErrorMessage, listFiles, supportsFileListing } from '../api/client';
 
 const parseLines = (value = '') =>
   value
@@ -27,7 +27,14 @@ export default function DeleteFiles() {
       setRows(
         files.map((file) => ({
           key: file.id || file.thumbnail_url || file.original_url || file.url,
-          url: file.thumbnail_url || file.original_url || file.url,
+          url:
+            file.thumbnail_storage_url ||
+            file.original_storage_url ||
+            file.thumbnail_s3_key ||
+            file.original_s3_key ||
+            file.thumbnail_url ||
+            file.original_url ||
+            file.url,
           type: file.type || 'media',
           tags: file.tags || {}
         }))
@@ -77,9 +84,11 @@ export default function DeleteFiles() {
 
       <div className="tool-panel">
         <Space className="panel-actions" wrap>
-          <Button icon={<RefreshCw size={17} />} loading={loading} onClick={loadCurrentFiles}>
-            Load my files
-          </Button>
+          {supportsFileListing && (
+            <Button icon={<RefreshCw size={17} />} loading={loading} onClick={loadCurrentFiles}>
+              Load my files
+            </Button>
+          )}
           <Button
             danger
             type="primary"
@@ -133,7 +142,7 @@ export default function DeleteFiles() {
             ]}
           />
         ) : (
-          <Empty description="No files loaded" />
+          <Empty description="Enter media URLs above" />
         )}
       </div>
 

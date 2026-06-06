@@ -3,8 +3,8 @@ import { Image as ImageIcon, UploadCloud } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import {
   getErrorMessage,
-  normalizeResults,
   pollUploadStatus,
+  prepareMediaResults,
   requestPresignedUrl,
   uploadFileToS3
 } from '../api/client';
@@ -70,8 +70,11 @@ export default function UploadPage() {
       setStatus('presign');
       const presigned = await requestPresignedUrl(file);
       if (presigned.duplicate || presigned.status === 'duplicate') {
+        const [duplicateResult] = await prepareMediaResults({
+          items: [presigned.item || presigned.file || presigned]
+        });
         setStatus('complete');
-        setResult(presigned.item || presigned.file || presigned);
+        setResult(duplicateResult);
         message.warning('Duplicate file detected');
         return;
       }
@@ -88,7 +91,8 @@ export default function UploadPage() {
         key: presigned.key || presigned.objectKey,
         file
       });
-      setResult(normalizeResults({ items: [uploadResult] })[0] || uploadResult);
+      const [preparedResult] = await prepareMediaResults({ items: [uploadResult] });
+      setResult(preparedResult || uploadResult);
       if (uploadResult?.processing_pending) {
         setStatus('queued');
         message.info('Upload complete. Recognition is processing in the background.');
@@ -173,7 +177,7 @@ export default function UploadPage() {
               <Descriptions.Item label="Type">{result.type || file?.type || 'media'}</Descriptions.Item>
               <Descriptions.Item label="URL">
                 <Typography.Text copyable ellipsis>
-                  {result.original_url || result.url || 'Pending'}
+                  {result.original_storage_url || result.original_url || result.url || 'Pending'}
                 </Typography.Text>
               </Descriptions.Item>
             </Descriptions>

@@ -68,8 +68,8 @@ export default function TagManage() {
           <Form.List name="rows">
             {(fields, { add, remove }) => (
               <>
-                {fields.map((field) => (
-                  <div className="query-row" key={field.key}>
+                {fields.map(({ key, ...field }) => (
+                  <div className="query-row" key={key}>
                     <Form.Item
                       {...field}
                       name={[field.name, 'species']}

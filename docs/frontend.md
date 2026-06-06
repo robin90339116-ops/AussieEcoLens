@@ -13,7 +13,7 @@ The React frontend covers the Assignment 2 UI criteria for authentication, uploa
 | `/verify` | Email verification code confirmation | Cognito Auth |
 | `/new-password` | Temporary-password replacement | Cognito Auth |
 | `/upload` | Media selection, presigned URL upload, progress, optional processing status | `POST /upload/presigned`, S3 `PUT`, optional status path |
-| `/search` | Q1 tag-count AND query, Q2 species query, Q4 uploaded-file query | `/query/by-tags`, `/query/by-species`, `/query/by-file` |
+| `/search` | Q1 tag-count AND query, Q2 species query, Q3 thumbnail URL lookup, Q4 uploaded-file query | `/query/by-tags`, `/query/by-species`, `/query/by-thumbnail`, `/query/by-file` |
 | `/results` | Thumbnail/video gallery and Q3 full-size lookup | `/query/by-thumbnail` |
 | `/tag-manage` | Q5 bulk add/remove tags | `/tags/modify` |
 | `/delete` | Q6 multi-select deletion with confirmation | `DELETE /files` |
@@ -57,6 +57,9 @@ The API client accepts common response shapes used during integration:
 - Result lists can be returned as `items`, `results`, `files`, or a raw array.
 - Single ML metadata records from B are also accepted, including `file_id`, `file_type`,
   `original_url`, `thumbnail_url`, `tags`, and `predictions`.
+- Private S3 keys and raw S3 object URLs returned by query APIs are converted to
+  short-lived read URLs through `POST /upload/presigned` before media is displayed.
+  The raw storage reference is retained for Q3, Q5, and Q6 requests.
 - Q4 sends uploaded query images to D's API Gateway route as JSON with
   `image_base64`, `filename`, `content_type`, and `limit`.
 - Gallery records can include `thumbnail_url`, `thumbnailUrl`, `url`, `original_url`, `originalUrl`, `type`, and `tags`.
@@ -68,8 +71,8 @@ The API client accepts common response shapes used during integration:
 All authenticated API calls attach `Authorization: Bearer <token>` using Amplify's current Cognito session.
 
 The S3-triggered thumbnail, ML, and database pipeline is asynchronous. Until the team
-provides an upload-status endpoint, the upload page reports recognition as queued instead
-of claiming that tags are already available.
+provides an upload-status endpoint, the upload page previews an uploaded image through a
+read URL and reports recognition as queued instead of claiming that tags are already available.
 
 ## Build
 

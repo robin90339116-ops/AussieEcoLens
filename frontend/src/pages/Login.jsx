@@ -1,4 +1,4 @@
-import { Alert, Button, Form, Input, Space, Typography, message } from 'antd';
+import { Button, Form, Input, Space, Typography, message } from 'antd';
 import { LogIn, UserPlus } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { getErrorMessage } from '../api/client';
@@ -7,7 +7,7 @@ import { useAuth } from '../context/AuthContext';
 export default function Login() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { login, mockAuth } = useAuth();
+  const { login } = useAuth();
   const [form] = Form.useForm();
   const redirectTo = location.state?.from?.pathname || '/upload';
 
@@ -36,14 +36,6 @@ export default function Login() {
           <span className="brand-mark">AE</span>
           <Typography.Title level={1}>Aussie EcoLens</Typography.Title>
         </div>
-        {mockAuth && (
-          <Alert
-            type="warning"
-            showIcon
-            message="Local mock authentication is active"
-            className="auth-alert"
-          />
-        )}
         <Form form={form} layout="vertical" onFinish={handleSubmit} requiredMark={false}>
           <Form.Item
             name="email"

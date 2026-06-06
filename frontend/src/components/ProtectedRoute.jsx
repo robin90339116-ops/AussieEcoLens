@@ -15,9 +15,8 @@ export default function ProtectedRoute() {
   }
 
   if (!user) {
-    return <Navigate to="/login" replace state={{ from: location }} />;
+    return <Navigate to="/signup" replace state={{ from: location }} />;
   }
 
   return <Outlet />;
 }
-

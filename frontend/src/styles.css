@@ -434,6 +434,17 @@ ul.main-menu:focus-visible {
   padding: 18px;
 }
 
+.thumbnail-query-form {
+  align-items: end;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(360px, 1fr) auto;
+}
+
+.thumbnail-query-form .ant-form-item {
+  margin-bottom: 0;
+}
+
 .gallery-grid {
   display: grid;
   gap: 16px;
@@ -615,6 +626,10 @@ ul.main-menu:focus-visible {
 
   .two-column-form,
   .query-row {
+    grid-template-columns: 1fr;
+  }
+
+  .thumbnail-query-form {
     grid-template-columns: 1fr;
   }
 
