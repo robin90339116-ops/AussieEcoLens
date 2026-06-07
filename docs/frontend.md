@@ -37,8 +37,10 @@ Ruitong's S3 CORS config currently allows that origin for direct presigned uploa
 The current Cognito values from A's 2026-06-03 setup are `us-east-1`, user pool
 `us-east-1_lb6SisPnD`, and app client `fvmq1uralbq80r9q7nrnonh73`. The API Gateway
 prod base URL is `https://66h13afw3g.execute-api.us-east-1.amazonaws.com/prod`;
-`/upload/presigned` and `/upload/check-dup` are live, while the remaining
-query/tag/delete/notification methods still need final deployed endpoint confirmation before the demo.
+`/upload/presigned` and `/upload/check-dup` are live. Q1/Q2 use D's protected GCP
+Cloud Functions root
+`https://australia-southeast1-project-e8ee6cc2-5c7b-44f3-aeb.cloudfunctions.net`
+with paths `/q1_query_by_tags` and `/q2_query_by_species`.
 
 For Wenxuan's ML service, Q4 must run through API Gateway `/query/by-file`.
 B's `/v1/*` token is backend-only and must not appear in frontend code or environment files.
@@ -60,6 +62,8 @@ The API client accepts common response shapes used during integration:
 - Private S3 keys and raw S3 object URLs returned by query APIs are converted to
   short-lived read URLs through `POST /upload/presigned` before media is displayed.
   The raw storage reference is retained for Q3, Q5, and Q6 requests.
+- If a user pastes a presigned S3 thumbnail URL into Q3, the frontend removes the
+  temporary signature query string before sending it to `/query/by-thumbnail`.
 - Q4 sends uploaded query images to D's API Gateway route as JSON with
   `image_base64`, `filename`, `content_type`, and `limit`.
 - Gallery records can include `thumbnail_url`, `thumbnailUrl`, `url`, `original_url`, `originalUrl`, `type`, and `tags`.
@@ -69,6 +73,8 @@ The API client accepts common response shapes used during integration:
   D also supports `GET /notifications/subscribe?email=<user>` for loading the current subscription list.
 
 All authenticated API calls attach `Authorization: Bearer <token>` using Amplify's current Cognito session.
+Q1/Q2 requests therefore carry the same Cognito JWT to GCP, where D's functions verify
+the token and filter results by the logged-in user.
 
 The S3-triggered thumbnail, ML, and database pipeline is asynchronous. Until the team
 provides an upload-status endpoint, the upload page previews an uploaded image through a

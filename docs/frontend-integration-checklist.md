@@ -10,7 +10,7 @@ Use this checklist before the final demo. It is not report text; it is a practic
 | `VITE_COGNITO_USER_POOL_ID=us-east-1_lb6SisPnD` | A | Cognito User Pool used by Amplify Auth |
 | `VITE_COGNITO_CLIENT_ID=fvmq1uralbq80r9q7nrnonh73` | A | Public SPA App Client ID; no client secret |
 | `VITE_AWS_API_BASE_URL=https://66h13afw3g.execute-api.us-east-1.amazonaws.com/prod` | A | API Gateway prod invoke URL for live upload endpoints |
-| `VITE_GCP_API_BASE_URL` | D | Optional separate GCP Cloud Functions root for Q1/Q2; leave empty if API Gateway routes them |
+| `VITE_GCP_API_BASE_URL=https://australia-southeast1-project-e8ee6cc2-5c7b-44f3-aeb.cloudfunctions.net` | D | Protected GCP Cloud Functions root for Q1/Q2 |
 | `VITE_USE_MOCKS=false` | C | Must be false for real integration and demo |
 
 ## API Gateway Paths From A
@@ -21,8 +21,8 @@ Ruitong's 2026-06-03 package confirms the API Gateway resource tree, but also st
 | --- | --- | --- |
 | Presigned upload | `VITE_PRESIGNED_PATH` | `/upload/presigned` |
 | Duplicate check | `VITE_UPLOAD_CHECK_DUP_PATH` | `/upload/check-dup` |
-| Q1 tag-count query | `VITE_Q1_PATH` | `/query/by-tags` |
-| Q2 species query | `VITE_Q2_PATH` | `/query/by-species` |
+| Q1 tag-count query | `VITE_Q1_PATH` | `/q1_query_by_tags` |
+| Q2 species query | `VITE_Q2_PATH` | `/q2_query_by_species` |
 | Q3 thumbnail lookup | `VITE_Q3_PATH` | `/query/by-thumbnail` |
 | Q4 uploaded-file query | `VITE_Q4_PATH` | `/query/by-file` |
 | Q5 tag edit | `VITE_Q5_PATH` | `/tags/modify` |
@@ -48,6 +48,9 @@ Ruitong's branch adds Lambda code for presigned upload and duplicate checking:
 - Query responses may contain private S3 keys or raw object URLs. The frontend extracts
   the object key, requests a short-lived GET URL from this Lambda for display, and keeps
   the raw reference for later Q3/Q5/Q6 requests.
+- Q3 accepts the stored thumbnail URL. If a copied thumbnail URL contains an
+  `X-Amz-Signature` query string, the frontend strips the temporary query parameters
+  before calling `/query/by-thumbnail`.
 - The frontend computes SHA-256 in the browser before requesting the upload URL, then uploads the file to S3 using `PUT`.
 - Ruitong's S3 CORS config currently allows `http://localhost:3000`, so the Vite dev server is configured to use port `3000` for local integration.
 
@@ -73,8 +76,12 @@ These methods and body shapes were read from `origin/Lianjun-Zhang`:
 - Duplicate check: A's Lambda expects `POST /upload/check-dup` with the SHA-256 `checksum` field; legacy `file_hash` is also accepted.
 - Upload status/result: Ruitong's resource tree has no status endpoint yet. If A adds one,
   set `VITE_UPLOAD_STATUS_PATH`; otherwise the frontend reports recognition as queued.
-- Q1 tag count query: D's GCP handler expects `POST` JSON `{ tags: { species: count }, limit }` and returns `items`.
-- Q2 species query: D's GCP handler expects `POST` JSON `{ species, limit }` or query params and returns `items`.
+- Q1 tag count query: D's deployed GCP handler is
+  `https://australia-southeast1-project-e8ee6cc2-5c7b-44f3-aeb.cloudfunctions.net/q1_query_by_tags`;
+  it expects `POST` JSON `{ tags: { species: count }, limit }`, verifies Cognito JWTs, filters by the logged-in user, and returns `items`.
+- Q2 species query: D's deployed GCP handler is
+  `https://australia-southeast1-project-e8ee6cc2-5c7b-44f3-aeb.cloudfunctions.net/q2_query_by_species`;
+  it expects `POST` JSON `{ species, limit }`, verifies Cognito JWTs, filters by the logged-in user, and returns `items`.
 - Q3 thumbnail lookup: D's AWS Lambda expects `POST` JSON `{ thumbnail_url }` and returns `original_url`, `thumbnail_url`, `tags`, and `type`.
 - Q4 uploaded-file query: D's AWS Lambda expects `POST` JSON
   `{ image_base64, filename, content_type, limit }` or `{ image_url, limit }`;
@@ -98,8 +105,10 @@ These methods and body shapes were read from `origin/Lianjun-Zhang`:
 6. Upload one image and verify progress and the uploaded-image preview. If no status
    endpoint is deployed, confirm the page says `Recognition queued`; otherwise also
    verify the generated thumbnail and tags.
-7. Run Q1 with two species/count rows and confirm AND semantics.
-8. Run Q2 for one species.
+7. Run Q1 with two species/count rows and confirm AND semantics. Use the same login
+   account that uploaded the test image, because D's GCP queries filter by Cognito user.
+8. Run Q2 for one species and confirm the browser Network request goes to the
+   `cloudfunctions.net` domain with an `Authorization: Bearer ...` header.
 9. Run Q4 with a query image and confirm the query image is not stored.
 10. Run Q3 from the thumbnail URL tab, then click a result thumbnail and confirm the
     full-size image opens.

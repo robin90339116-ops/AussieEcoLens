@@ -199,7 +199,7 @@ export default function SearchPage() {
                       { type: 'url', message: 'Enter a valid URL' }
                     ]}
                   >
-                    <Input placeholder="https://.../thumbnails/example.jpg" />
+                    <Input placeholder="Paste a thumbnail URL, including copied S3/presigned URLs" />
                   </Form.Item>
                   <Button type="primary" htmlType="submit" loading={loading} icon={<Search size={17} />}>
                     Find original

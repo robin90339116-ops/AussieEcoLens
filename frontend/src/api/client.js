@@ -152,11 +152,14 @@ export const normalizeResults = (responsePayload) => {
     }
 
     const originalUrl =
+      item.original_access_url ||
+      item.originalAccessUrl ||
       item.original_url ||
       item.originalUrl ||
       item.fullUrl ||
       item.mediaUrl ||
       item.url ||
+      item.original_raw_url ||
       item.thumbnail_url ||
       item.thumbnailUrl;
     const rawType = String(item.type || item.file_type || '').toLowerCase();
@@ -165,6 +168,8 @@ export const normalizeResults = (responsePayload) => {
         ? 'video'
         : 'image';
     const thumbnailUrl =
+      item.thumbnail_access_url ||
+      item.thumbnailAccessUrl ||
       item.thumbnail_url ||
       item.thumbnailUrl ||
       item.thumbnail ||
@@ -176,8 +181,20 @@ export const normalizeResults = (responsePayload) => {
       ...item,
       id: item.id || item.file_id || item.fileId || originalUrl || `result-${index}`,
       type,
-      thumbnail_storage_url: item.thumbnail_storage_url || thumbnailUrl,
-      original_storage_url: item.original_storage_url || originalUrl,
+      thumbnail_storage_url:
+        item.thumbnail_storage_url ||
+        item.thumbnail_raw_url ||
+        item.thumbnail_s3_key ||
+        item.thumbnailS3Key ||
+        item.thumbnail_url ||
+        thumbnailUrl,
+      original_storage_url:
+        item.original_storage_url ||
+        item.original_raw_url ||
+        item.original_s3_key ||
+        item.originalS3Key ||
+        item.original_url ||
+        originalUrl,
       thumbnail_url: thumbnailUrl,
       original_url: originalUrl,
       url: item.url || originalUrl,
@@ -222,6 +239,19 @@ const getS3Key = (reference) => {
 
 const isTemporaryMediaUrl = (reference) =>
   /^(blob:|data:)/i.test(reference || '') || /[?&]X-Amz-Signature=/i.test(reference || '');
+
+const stripPresignedQuery = (reference) => {
+  if (!/[?&]X-Amz-Signature=/i.test(reference || '')) {
+    return reference;
+  }
+
+  try {
+    const url = new URL(reference);
+    return `${url.origin}${url.pathname}`;
+  } catch {
+    return reference;
+  }
+};
 
 const prepareResultMedia = async (item) => {
   const isVideo = item.type === 'video';
@@ -390,14 +420,16 @@ export async function queryBySpecies(species) {
 export async function queryByThumbnailUrl(thumbnailUrl) {
   ensureBaseUrl(config.awsApiBaseUrl, 'AWS');
   const { data } = await awsClient.post(config.paths.thumbnailLookup, {
-    thumbnail_url: thumbnailUrl
+    thumbnail_url: stripPresignedQuery(thumbnailUrl)
   });
   return prepareMediaResults(data);
 }
 
 export async function resolveOriginalUrl(thumbnailUrl) {
   ensureBaseUrl(config.awsApiBaseUrl, 'AWS');
-  const { data } = await awsClient.post(config.paths.thumbnailLookup, { thumbnail_url: thumbnailUrl });
+  const { data } = await awsClient.post(config.paths.thumbnailLookup, {
+    thumbnail_url: stripPresignedQuery(thumbnailUrl)
+  });
   const payload = unwrapResponsePayload(data);
   const originalReference =
     payload.original_s3_key ||
