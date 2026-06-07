@@ -1,0 +1,27 @@
+{
+  "account": "983018774467",
+  "region": "us-east-1",
+  "dynamodb": {
+    "AussieEcoLensFiles": "arn:aws:dynamodb:us-east-1:983018774467:table/AussieEcoLensFiles",
+    "AussieEcoLensNotificationsSub": "arn:aws:dynamodb:us-east-1:983018774467:table/AussieEcoLensNotificationsSub"
+  },
+  "sns": {
+    "AussieEcoLensSpeciesNotifications": "arn:aws:sns:us-east-1:983018774467:AussieEcoLensSpeciesNotifications"
+  },
+  "lambda": {
+    "AussieEcoLensD-Q3ThumbnailLookup": "arn:aws:lambda:us-east-1:983018774467:function:AussieEcoLensD-Q3ThumbnailLookup",
+    "AussieEcoLensD-Q4ImageSearch": "arn:aws:lambda:us-east-1:983018774467:function:AussieEcoLensD-Q4ImageSearch",
+    "AussieEcoLensD-Q5UpdateTags": "arn:aws:lambda:us-east-1:983018774467:function:AussieEcoLensD-Q5UpdateTags",
+    "AussieEcoLensD-Q6DeleteFile": "arn:aws:lambda:us-east-1:983018774467:function:AussieEcoLensD-Q6DeleteFile",
+    "AussieEcoLensD-Notifications": "arn:aws:lambda:us-east-1:983018774467:function:AussieEcoLensD-Notifications"
+  },
+  "api_gateway": {
+    "http_apis": [],
+    "rest_apis": [
+      {
+        "id": "66h13afw3g",
+        "name": "EcoLensAPI"
+      }
+    ]
+  }
+}
