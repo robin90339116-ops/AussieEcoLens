@@ -10,24 +10,35 @@ from db_access import query_by_species, query_by_tag_counts
 from jwt_auth import with_cognito_auth
 
 
-def _cors_headers() -> dict[str, str]:
+def _allowed_origin(request: Request | None = None) -> str:
+    configured = os.getenv("CORS_ALLOW_ORIGIN", "http://localhost:3000")
+    allowed = [origin.strip() for origin in configured.split(",") if origin.strip()]
+    if "*" in allowed:
+        return "*"
+    request_origin = request.headers.get("Origin") if request else None
+    if request_origin and request_origin in allowed:
+        return request_origin
+    return allowed[0] if allowed else "http://localhost:3000"
+
+
+def _cors_headers(request: Request | None = None) -> dict[str, str]:
     return {
-        "Access-Control-Allow-Origin": os.getenv("CORS_ALLOW_ORIGIN", "*"),
+        "Access-Control-Allow-Origin": _allowed_origin(request),
         "Access-Control-Allow-Headers": "Content-Type,Authorization",
         "Access-Control-Allow-Methods": "OPTIONS,GET,POST",
     }
 
 
-def _json_response(body: Any, status: int = 200):
+def _json_response(body: Any, status: int = 200, request: Request | None = None):
     response = make_response(jsonify(body), status)
-    for key, value in _cors_headers().items():
+    for key, value in _cors_headers(request).items():
         response.headers[key] = value
     return response
 
 
-def _handle_options():
+def _handle_options(request: Request):
     response = make_response("", 204)
-    for key, value in _cors_headers().items():
+    for key, value in _cors_headers(request).items():
         response.headers[key] = value
     return response
 
@@ -48,17 +59,17 @@ def _owner_id(request: Request, body: dict[str, Any]) -> str | None:
 @with_cognito_auth
 def q1_query_by_tags(request: Request):
     if request.method == "OPTIONS":
-        return _handle_options()
+        return _handle_options(request)
 
     body = _request_json(request)
     tags = body.get("tags") or body.get("required_tags")
     if not isinstance(tags, dict) or not tags:
-        return _json_response({"error": "tags must be a non-empty object, e.g. {'wombat': 2}"}, 400)
+        return _json_response({"error": "tags must be a non-empty object, e.g. {'wombat': 2}"}, 400, request)
 
     try:
         limit = int(body.get("limit", 100))
     except (TypeError, ValueError):
-        return _json_response({"error": "limit must be an integer"}, 400)
+        return _json_response({"error": "limit must be an integer"}, 400, request)
 
     items = query_by_tag_counts(tags, owner_id=_owner_id(request, body), limit=limit)
     return _json_response(
@@ -67,7 +78,8 @@ def q1_query_by_tags(request: Request):
             "logic": "AND",
             "count": len(items),
             "items": items,
-        }
+        },
+        request=request,
     )
 
 
@@ -75,17 +87,17 @@ def q1_query_by_tags(request: Request):
 @with_cognito_auth
 def q2_query_by_species(request: Request):
     if request.method == "OPTIONS":
-        return _handle_options()
+        return _handle_options(request)
 
     body = _request_json(request)
     species = request.args.get("species") or body.get("species")
     if not species:
-        return _json_response({"error": "species is required"}, 400)
+        return _json_response({"error": "species is required"}, 400, request)
 
     try:
         limit = int(body.get("limit", request.args.get("limit", 100)))
     except (TypeError, ValueError):
-        return _json_response({"error": "limit must be an integer"}, 400)
+        return _json_response({"error": "limit must be an integer"}, 400, request)
 
     items = query_by_species(species, owner_id=_owner_id(request, body), limit=limit)
     return _json_response(
@@ -94,6 +106,6 @@ def q2_query_by_species(request: Request):
             "species": species,
             "count": len(items),
             "items": items,
-        }
+        },
+        request=request,
     )
-

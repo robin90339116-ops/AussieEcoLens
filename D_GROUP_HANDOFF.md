@@ -13,11 +13,11 @@ This branch contains the urgent D group API work for AussieEcoLens.
   - `lambda/shared/aussie_ecolens_db.py`
   - `lambda/shared/sns_helpers.py`
 - AWS Lambda handlers:
-  - Q3 thumbnail URL to original URL lookup
+  - Q3 thumbnail URL to original URL lookup, returning presigned media access URLs
   - Q4 query file search, calling B's Oracle tagging endpoint and not storing the query image
   - Q5 batch add/remove tags
   - Q6 delete file from S3 and DynamoDB
-  - notification subscribe/unsubscribe/publish helper
+  - notification subscribe/unsubscribe/list/publish helper with SNS subscription ARN tracking
 - GCP Cloud Functions:
   - Q1 tag + count AND query
   - Q2 species query
@@ -51,6 +51,18 @@ B can import `lambda/shared/aussie_ecolens_db.py` to write records after ML tagg
 
 C can use the documented Q1/Q2/Q3/Q4/Q5/Q6 request and response formats to wire the UI, but should confirm whether Q1/Q2 are exposed through A's API Gateway or directly through the protected GCP HTTPS URLs.
 
+Final AWS-side paths for A/C integration:
+
+- `POST /query/by-thumbnail` -> Q3
+- `POST /query/by-file` -> Q4
+- `POST /tags/modify` -> Q5
+- `DELETE /files` -> Q6
+- `GET/POST /notifications/subscribe` -> notification list/subscribe/unsubscribe/publish
+
+Query responses include short-lived `original_access_url` and `thumbnail_access_url`
+fields for private S3 media. The original stored values are retained in
+`original_raw_url` and `thumbnail_raw_url` when signing succeeds.
+
 ## Still needed before final demo
 
 - Real AWS/GCP deployment using team credentials.
@@ -62,6 +74,7 @@ C can use the documented Q1/Q2/Q3/Q4/Q5/Q6 request and response formats to wire 
   - `ORACLE_TAG_UPLOAD_URL`
   - `ORACLE_API_TOKEN`
 - Final endpoint URLs pasted back into `docs/db-and-queries.md`.
+- Run `scripts/package_d_lambdas.sh` before AWS Lambda upload so each zip includes `lambda/shared`.
 - Final team report and individual report.
 - Final architecture figure redraw with official AWS/GCP icons if required.
 

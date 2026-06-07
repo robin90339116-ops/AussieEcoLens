@@ -16,7 +16,7 @@ import boto3
 SHARED_DIR = Path(__file__).resolve().parents[2] / "shared"
 sys.path.insert(0, str(SHARED_DIR))
 
-from aussie_ecolens_db import query_by_tag_counts
+from aussie_ecolens_db import attach_presigned_media_urls_to_items, query_by_tag_counts
 from http_utils import parse_json_body, response
 
 
@@ -206,7 +206,7 @@ def lambda_handler(event, context):
 
     limit = int(body.get("limit", 100))
     owner_id = body.get("owner_id")
-    matches = query_by_tag_counts(tags, owner_id=owner_id, limit=limit)
+    matches = attach_presigned_media_urls_to_items(query_by_tag_counts(tags, owner_id=owner_id, limit=limit))
 
     return response(
         200,

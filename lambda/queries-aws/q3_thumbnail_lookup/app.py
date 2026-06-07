@@ -6,7 +6,7 @@ from pathlib import Path
 SHARED_DIR = Path(__file__).resolve().parents[2] / "shared"
 sys.path.insert(0, str(SHARED_DIR))
 
-from aussie_ecolens_db import get_by_thumbnail_url
+from aussie_ecolens_db import attach_presigned_media_urls, get_by_thumbnail_url
 from http_utils import parse_json_body, query_params, response
 
 
@@ -26,12 +26,17 @@ def lambda_handler(event, context):
     if not item:
         return response(404, {"error": "file_not_found"})
 
+    item = attach_presigned_media_urls(item)
     return response(
         200,
         {
             "file_id": item["file_id"],
             "thumbnail_url": item.get("thumbnail_url"),
+            "thumbnail_access_url": item.get("thumbnail_access_url"),
+            "thumbnail_raw_url": item.get("thumbnail_raw_url"),
             "original_url": item.get("original_url"),
+            "original_access_url": item.get("original_access_url"),
+            "original_raw_url": item.get("original_raw_url"),
             "tags": item.get("tags", {}),
             "type": item.get("type"),
         },

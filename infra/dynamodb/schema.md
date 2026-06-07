@@ -29,5 +29,6 @@ Primary key: `user_email` string.
 Attributes:
 
 - `species_list`: subscribed species names.
+- `subscription_arn`: SNS email subscription ARN, or the pending confirmation marker returned by SNS.
 - `created_at`: UTC ISO timestamp.
-
+- `updated_at`: UTC ISO timestamp.

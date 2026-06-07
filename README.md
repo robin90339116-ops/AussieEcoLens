@@ -11,6 +11,7 @@ handoff work.
 - Cognito JWT verification for direct GCP HTTPS access.
 - SNS notification helper and subscription API.
 - API Gateway route handoff for A group.
+- Lambda packaging scripts for D's five AWS handlers.
 - Local smoke tests and handler unit tests.
 
 ## Important integration boundary
@@ -23,6 +24,8 @@ For the formal frontend demo:
 - B's Oracle tagging token must remain private behind backend services.
 - D's GCP Q1/Q2 endpoints may be exposed directly only as HTTPS endpoints with
   Cognito JWT verification enabled.
+- Query responses return short-lived media access URLs so private S3 images and
+  videos can be previewed by the frontend.
 
 ## Key files
 
@@ -33,6 +36,8 @@ For the formal frontend demo:
 - `infra/api-gateway/d-group-openapi-fragment.yaml`: A group route handoff.
 - `infra/dynamodb/template.yaml`: DynamoDB CloudFormation template.
 - `infra/sns/template.yaml`: SNS CloudFormation template.
+- `scripts/package_d_lambdas.sh`: packages Q3/Q4/Q5/Q6/notifications with shared helpers.
+- `scripts/deploy_d_infra.sh`: deploys DynamoDB and SNS CloudFormation stacks.
 - `lambda/shared/`: DB and SNS helper code.
 - `lambda/queries-aws/`: AWS Lambda handlers.
 - `gcp-functions/queries-gcp/`: GCP Q1/Q2 functions.

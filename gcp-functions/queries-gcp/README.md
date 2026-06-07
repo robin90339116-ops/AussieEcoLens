@@ -21,7 +21,9 @@ Required environment variables:
 - `COGNITO_USER_POOL_ID`: Cognito user pool id.
 - `COGNITO_APP_CLIENT_ID`: Cognito app client id.
 - `AUTH_REQUIRED`: set `false` only for local smoke tests.
-- `CORS_ALLOW_ORIGIN`: frontend origin, default `*`.
+- `CORS_ALLOW_ORIGIN`: frontend origin list, default `http://localhost:3000`.
+- `PRESIGN_MEDIA_URLS`: keep `true` so private S3 media is returned as short-lived presigned GET URLs.
+- `PRESIGNED_URL_EXPIRES_SECONDS`: default `900`.
 
 GCP must have AWS credentials available through Secret Manager or environment
 variables so `boto3` can read DynamoDB.
@@ -40,7 +42,7 @@ gcloud functions deploy q1_query_by_tags \
   --entry-point=q1_query_by_tags \
   --trigger-http \
   --allow-unauthenticated \
-  --set-env-vars=AWS_REGION=us-east-1,FILES_TABLE=AussieEcoLensFiles,COGNITO_REGION=us-east-1,COGNITO_USER_POOL_ID=YOUR_POOL_ID,COGNITO_APP_CLIENT_ID=YOUR_CLIENT_ID
+  --set-env-vars=AWS_REGION=us-east-1,FILES_TABLE=AussieEcoLensFiles,COGNITO_REGION=us-east-1,COGNITO_USER_POOL_ID=YOUR_POOL_ID,COGNITO_APP_CLIENT_ID=YOUR_CLIENT_ID,AUTH_REQUIRED=true,CORS_ALLOW_ORIGIN=http://localhost:3000
 
 gcloud functions deploy q2_query_by_species \
   --gen2 \
@@ -50,7 +52,7 @@ gcloud functions deploy q2_query_by_species \
   --entry-point=q2_query_by_species \
   --trigger-http \
   --allow-unauthenticated \
-  --set-env-vars=AWS_REGION=us-east-1,FILES_TABLE=AussieEcoLensFiles,COGNITO_REGION=us-east-1,COGNITO_USER_POOL_ID=YOUR_POOL_ID,COGNITO_APP_CLIENT_ID=YOUR_CLIENT_ID
+  --set-env-vars=AWS_REGION=us-east-1,FILES_TABLE=AussieEcoLensFiles,COGNITO_REGION=us-east-1,COGNITO_USER_POOL_ID=YOUR_POOL_ID,COGNITO_APP_CLIENT_ID=YOUR_CLIENT_ID,AUTH_REQUIRED=true,CORS_ALLOW_ORIGIN=http://localhost:3000
 ```
 
 `--allow-unauthenticated` only makes the HTTPS trigger reachable. Application-level Cognito JWT verification still protects the function when `AUTH_REQUIRED=true`.

@@ -12,6 +12,9 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 
 def load_module(name: str, relative_path: str):
+    shared_path = str(PROJECT_ROOT / "lambda/shared")
+    if shared_path not in sys.path:
+        sys.path.insert(0, shared_path)
     path = PROJECT_ROOT / relative_path
     spec = importlib.util.spec_from_file_location(name, path)
     if spec is None or spec.loader is None:
@@ -63,6 +66,18 @@ def multipart_event(file_bytes: bytes, fields: dict[str, str] | None = None):
     }
 
 
+class FakeS3Client:
+    def __init__(self):
+        self.deleted: list[dict] = []
+
+    def generate_presigned_url(self, operation, Params, ExpiresIn):
+        return f"https://signed.example.com/{Params['Bucket']}/{Params['Key']}?expires={ExpiresIn}&X-Amz-Signature=test"
+
+    def delete_object(self, Bucket, Key):
+        self.deleted.append({"Bucket": Bucket, "Key": Key})
+        return {}
+
+
 class HandlerTests(unittest.TestCase):
     def test_http_utils_parses_base64_json_body(self):
         http_utils = load_module("test_http_utils", "lambda/shared/http_utils.py")
@@ -83,6 +98,26 @@ class HandlerTests(unittest.TestCase):
         response = q3.lambda_handler(api_event({"thumbnail_url": "thumb-url"}), None)
         self.assertEqual(response["statusCode"], 200)
         self.assertEqual(body_of(response)["original_url"], "https://example.com/original.jpg")
+
+    def test_db_helper_adds_presigned_media_urls_and_matches_signed_lookup(self):
+        db = load_module("test_db_helper_presign", "lambda/shared/aussie_ecolens_db.py")
+        db._s3_client = lambda: FakeS3Client()
+        item = db.attach_presigned_media_urls(
+            {
+                "file_id": "file-1",
+                "original_url": "https://bucket.s3.us-east-1.amazonaws.com/originals/a.jpg",
+                "thumbnail_url": "https://bucket.s3.us-east-1.amazonaws.com/thumbs/a.jpg",
+            }
+        )
+
+        self.assertIn("X-Amz-Signature=test", item["original_url"])
+        self.assertEqual(item["original_raw_url"], "https://bucket.s3.us-east-1.amazonaws.com/originals/a.jpg")
+        self.assertTrue(
+            db._same_url(
+                "https://bucket.s3.us-east-1.amazonaws.com/thumbs/a.jpg",
+                "https://bucket.s3.us-east-1.amazonaws.com/thumbs/a.jpg?X-Amz-Signature=test",
+            )
+        )
 
     def test_q3_thumbnail_lookup_requires_url(self):
         q3 = load_module("test_q3_app_missing", "lambda/queries-aws/q3_thumbnail_lookup/app.py")
@@ -199,6 +234,62 @@ class HandlerTests(unittest.TestCase):
         )
         self.assertEqual(response["statusCode"], 200)
         self.assertEqual(body_of(response)["subscriptions"][0]["species_list"], ["wombat"])
+
+    def test_sns_subscribe_deduplicates_existing_species(self):
+        sns = load_module("test_sns_helpers_dedup", "lambda/shared/sns_helpers.py")
+        sns.get_subscription = lambda user_email: {
+            "user_email": user_email,
+            "species_list": ["wombat"],
+            "subscription_arn": "arn:aws:sns:us-east-1:123:topic:sub",
+        }
+
+        result = sns.subscribe_email(user_email="student@example.com", species_list=["wombat"])
+        self.assertTrue(result["duplicate"])
+        self.assertFalse(result["confirmation_required"])
+
+    def test_sns_unsubscribe_updates_filter_when_species_remain(self):
+        sns = load_module("test_sns_helpers_unsub_filter", "lambda/shared/sns_helpers.py")
+        calls: list[dict] = []
+
+        class FakeSNS:
+            def set_subscription_attributes(self, **kwargs):
+                calls.append(kwargs)
+
+        sns.sns_client = lambda: FakeSNS()
+        sns.get_subscription = lambda user_email: {
+            "user_email": user_email,
+            "species_list": ["wombat", "magpie"],
+            "subscription_arn": "arn:aws:sns:us-east-1:123:topic:sub",
+        }
+        sns.save_subscription = lambda user_email, species_list, subscription_arn=None: {
+            "user_email": user_email,
+            "species_list": species_list,
+            "subscription_arn": subscription_arn,
+        }
+
+        result = sns.unsubscribe_email(user_email="student@example.com", species_list=["wombat"])
+        self.assertEqual(result["remaining"], ["magpie"])
+        self.assertEqual(calls[0]["AttributeName"], "FilterPolicy")
+
+    def test_sns_unsubscribe_calls_sns_when_no_species_remain(self):
+        sns = load_module("test_sns_helpers_unsub_all", "lambda/shared/sns_helpers.py")
+        calls: list[dict] = []
+
+        class FakeSNS:
+            def unsubscribe(self, **kwargs):
+                calls.append(kwargs)
+
+        sns.sns_client = lambda: FakeSNS()
+        sns.get_subscription = lambda user_email: {
+            "user_email": user_email,
+            "species_list": ["wombat"],
+            "subscription_arn": "arn:aws:sns:us-east-1:123:topic:sub",
+        }
+        sns.delete_subscription = lambda user_email, species_list=None: {"user_email": user_email, "deleted": "all"}
+
+        result = sns.unsubscribe_email(user_email="student@example.com", species_list=["wombat"])
+        self.assertEqual(result["sns_unsubscribed"], "arn:aws:sns:us-east-1:123:topic:sub")
+        self.assertEqual(calls[0]["SubscriptionArn"], "arn:aws:sns:us-east-1:123:topic:sub")
 
 
 if __name__ == "__main__":

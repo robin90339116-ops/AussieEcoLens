@@ -5,6 +5,7 @@ import uuid
 from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Any
+from urllib.parse import unquote, urlparse
 
 import boto3
 from boto3.dynamodb.conditions import Key
@@ -16,6 +17,10 @@ DEFAULT_NOTIFICATIONS_TABLE = "AussieEcoLensNotificationsSub"
 
 def _resource():
     return boto3.resource("dynamodb", region_name=os.getenv("AWS_REGION", "us-east-1"))
+
+
+def _s3_client():
+    return boto3.client("s3", region_name=os.getenv("AWS_REGION", "us-east-1"))
 
 
 def files_table():
@@ -59,6 +64,90 @@ def normalise_tags(tags: dict[str, Any] | list[str] | None) -> dict[str, Decimal
             continue
         cleaned[key] = Decimal(str(count))
     return cleaned
+
+
+def _s3_location_from_url(url: str | None) -> tuple[str, str] | None:
+    if not url:
+        return None
+    parsed = urlparse(url)
+    if parsed.scheme == "s3" and parsed.netloc and parsed.path:
+        return parsed.netloc, unquote(parsed.path.lstrip("/"))
+
+    host = parsed.netloc
+    path = unquote(parsed.path.lstrip("/"))
+    if not host or not path:
+        return None
+
+    if ".s3." in host:
+        return host.split(".s3.", 1)[0], path
+    if host.endswith(".s3.amazonaws.com"):
+        return host.split(".s3.amazonaws.com", 1)[0], path
+    if host.startswith("s3.") or host == "s3.amazonaws.com":
+        parts = path.split("/", 1)
+        if len(parts) == 2:
+            return parts[0], parts[1]
+    return None
+
+
+def _s3_location_from_record(item: dict[str, Any], prefix: str) -> tuple[str, str] | None:
+    key = item.get(f"{prefix}_s3_key")
+    if key:
+        bucket_env = "ORIGINAL_BUCKET" if prefix == "original" else "THUMBNAIL_BUCKET"
+        bucket = item.get(f"{prefix}_bucket") or os.getenv(bucket_env)
+        if bucket:
+            return str(bucket), str(key)
+    return _s3_location_from_url(item.get(f"{prefix}_url"))
+
+
+def _same_s3_object(left: str | None, right: str | None) -> bool:
+    left_location = _s3_location_from_url(left)
+    right_location = _s3_location_from_url(right)
+    return bool(left_location and right_location and left_location == right_location)
+
+
+def _same_url(left: str | None, right: str | None) -> bool:
+    if not left or not right:
+        return False
+    if left == right:
+        return True
+    if _same_s3_object(left, right):
+        return True
+    return urlparse(left)._replace(query="", fragment="").geturl() == urlparse(right)._replace(query="", fragment="").geturl()
+
+
+def _presigned_get_url(bucket: str, key: str) -> str | None:
+    if os.getenv("PRESIGN_MEDIA_URLS", "true").lower() in {"0", "false", "no"}:
+        return None
+    expires = int(os.getenv("PRESIGNED_URL_EXPIRES_SECONDS", "900"))
+    try:
+        return _s3_client().generate_presigned_url(
+            "get_object",
+            Params={"Bucket": bucket, "Key": key},
+            ExpiresIn=expires,
+        )
+    except Exception:
+        return None
+
+
+def attach_presigned_media_urls(item: dict[str, Any]) -> dict[str, Any]:
+    output = json_safe(item)
+    for prefix in ("original", "thumbnail"):
+        url_field = f"{prefix}_url"
+        raw_url = output.get(f"{prefix}_raw_url") or output.get(url_field)
+        location = _s3_location_from_record(output, prefix)
+        signed_url = _presigned_get_url(*location) if location else None
+        if signed_url:
+            if raw_url:
+                output[f"{prefix}_raw_url"] = raw_url
+            output[f"{prefix}_access_url"] = signed_url
+            output[url_field] = signed_url
+        elif raw_url:
+            output[f"{prefix}_access_url"] = raw_url
+    return output
+
+
+def attach_presigned_media_urls_to_items(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return [attach_presigned_media_urls(item) for item in items]
 
 
 def write_record(
@@ -126,14 +215,14 @@ def _scan_all(**kwargs: Any) -> list[dict[str, Any]]:
 
 def get_by_url(url: str) -> dict[str, Any] | None:
     for item in _scan_all():
-        if item.get("original_url") == url or item.get("thumbnail_url") == url:
+        if _same_url(item.get("original_url"), url) or _same_url(item.get("thumbnail_url"), url):
             return json_safe(item)
     return None
 
 
 def get_by_thumbnail_url(thumbnail_url: str) -> dict[str, Any] | None:
     for item in _scan_all():
-        if item.get("thumbnail_url") == thumbnail_url:
+        if _same_url(item.get("thumbnail_url"), thumbnail_url):
             return json_safe(item)
     return None
 
@@ -152,7 +241,7 @@ def query_by_tag_counts(
             continue
         tags = normalise_tags(item.get("tags", {}))
         if all(tags.get(species, Decimal(0)) >= count for species, count in required.items()):
-            matches.append(json_safe(item))
+            matches.append(attach_presigned_media_urls(item))
         if len(matches) >= limit:
             break
 
@@ -168,7 +257,7 @@ def query_by_species(species: str, *, owner_id: str | None = None, limit: int = 
             continue
         tags = normalise_tags(item.get("tags", {}))
         if tags.get(species_key, Decimal(0)) > 0:
-            matches.append(json_safe(item))
+            matches.append(attach_presigned_media_urls(item))
         if len(matches) >= limit:
             break
 
@@ -231,31 +320,52 @@ def delete_record(*, file_id: str | None = None, url: str | None = None) -> dict
     return json_safe(item)
 
 
-def save_subscription(*, user_email: str, species_list: list[str]) -> dict[str, Any]:
+def get_subscription(*, user_email: str) -> dict[str, Any] | None:
+    item = notifications_table().get_item(Key={"user_email": user_email}).get("Item")
+    return json_safe(item) if item else None
+
+
+def save_subscription(
+    *,
+    user_email: str,
+    species_list: list[str],
+    subscription_arn: str | None = None,
+) -> dict[str, Any]:
+    current = get_subscription(user_email=user_email)
+    timestamp = now_iso()
     item = {
         "user_email": user_email,
         "species_list": [normalise_species(species) for species in species_list],
-        "created_at": now_iso(),
+        "created_at": current.get("created_at", timestamp) if current else timestamp,
+        "updated_at": timestamp,
     }
+    if subscription_arn:
+        item["subscription_arn"] = subscription_arn
+    elif current and current.get("subscription_arn"):
+        item["subscription_arn"] = current["subscription_arn"]
     notifications_table().put_item(Item=item)
-    return item
+    return json_safe(item)
 
 
 def delete_subscription(*, user_email: str, species_list: list[str] | None = None) -> dict[str, Any]:
     if species_list is None:
+        current = get_subscription(user_email=user_email)
         notifications_table().delete_item(Key={"user_email": user_email})
-        return {"user_email": user_email, "deleted": "all"}
+        return {"user_email": user_email, "deleted": "all", "previous": current}
 
-    current = notifications_table().get_item(Key={"user_email": user_email}).get("Item")
+    current = get_subscription(user_email=user_email)
     if not current:
         return {"user_email": user_email, "deleted": []}
     remove_set = {normalise_species(species) for species in species_list}
     remaining = [species for species in current.get("species_list", []) if species not in remove_set]
-    notifications_table().update_item(
-        Key={"user_email": user_email},
-        UpdateExpression="SET species_list = :species_list",
-        ExpressionAttributeValues={":species_list": remaining},
-    )
+    if remaining:
+        save_subscription(
+            user_email=user_email,
+            species_list=remaining,
+            subscription_arn=current.get("subscription_arn"),
+        )
+    else:
+        notifications_table().delete_item(Key={"user_email": user_email})
     return {"user_email": user_email, "deleted": list(remove_set), "remaining": remaining}
 
 

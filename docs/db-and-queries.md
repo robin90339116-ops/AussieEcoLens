@@ -34,8 +34,10 @@ Common AWS environment variables:
 - `NOTIFICATIONS_TABLE=AussieEcoLensNotificationsSub`
 - `CHECKSUM_INDEX=checksum-index`
 - `SNS_TOPIC_ARN=arn:aws:sns:...`
-- `CORS_ALLOW_ORIGIN=http://localhost:5173`
+- `CORS_ALLOW_ORIGIN=http://localhost:3000`
 - `DEFAULT_OWNER_ID=unknown-owner`
+- `PRESIGN_MEDIA_URLS=true`
+- `PRESIGNED_URL_EXPIRES_SECONDS=900`
 
 GCP Function environment variables:
 
@@ -45,7 +47,7 @@ GCP Function environment variables:
 - `COGNITO_USER_POOL_ID=<from A>`
 - `COGNITO_APP_CLIENT_ID=<from A>`
 - `AUTH_REQUIRED=true`
-- `CORS_ALLOW_ORIGIN=<frontend origin>`
+- `CORS_ALLOW_ORIGIN=http://localhost:3000`
 
 For local smoke tests only, `AUTH_REQUIRED=false` can be used.
 
@@ -53,6 +55,12 @@ For the current team deployment, keep both `AWS_REGION` and `COGNITO_REGION` as
 `us-east-1` unless A confirms a different Cognito region. If GCP uses AWS
 Academy credentials to read DynamoDB, refresh those credentials in GCP before
 each demo or long integration session because they expire.
+
+Query responses include short-lived media access fields for private S3 objects:
+
+- `original_url` and `thumbnail_url`: replaced with presigned GET URLs when signing is possible.
+- `original_access_url` and `thumbnail_access_url`: explicit frontend preview fields.
+- `original_raw_url` and `thumbnail_raw_url`: original stored S3 URLs, retained for debugging.
 
 ## DynamoDB schema
 
@@ -89,7 +97,9 @@ Primary key:
 Attributes:
 
 - `species_list`: subscribed species names.
+- `subscription_arn`: SNS subscription ARN or pending confirmation marker.
 - `created_at`: UTC ISO timestamp.
+- `updated_at`: UTC ISO timestamp.
 
 ## Shared helper for A and B
 
@@ -174,7 +184,11 @@ Response:
     {
       "file_id": "file-001",
       "original_url": "https://...",
+      "original_access_url": "https://...",
+      "original_raw_url": "https://bucket.s3.us-east-1.amazonaws.com/originals/file-001.jpg",
       "thumbnail_url": "https://...",
+      "thumbnail_access_url": "https://...",
+      "thumbnail_raw_url": "https://bucket.s3.us-east-1.amazonaws.com/thumbs/file-001.jpg",
       "tags": {
         "wombat": 2,
         "magpie": 1
@@ -245,7 +259,7 @@ Owner: D. Platform: AWS Lambda + API Gateway.
 Endpoint:
 
 ```http
-POST <AWS_Q3_URL>
+POST <A_API_GATEWAY_BASE_URL>/query/by-thumbnail
 Authorization: Bearer <token>
 Content-Type: application/json
 ```
@@ -264,7 +278,11 @@ Response:
 {
   "file_id": "file-001",
   "thumbnail_url": "https://...",
+  "thumbnail_access_url": "https://...",
+  "thumbnail_raw_url": "https://bucket.s3.us-east-1.amazonaws.com/thumbs/file-001.jpg",
   "original_url": "https://...",
+  "original_access_url": "https://...",
+  "original_raw_url": "https://bucket.s3.us-east-1.amazonaws.com/originals/file-001.jpg",
   "tags": {
     "wombat": 2
   },
@@ -275,7 +293,7 @@ Response:
 Curl:
 
 ```bash
-curl -X POST "$AWS_Q3_URL" \
+curl -X POST "$A_API_GATEWAY_BASE_URL/query/by-thumbnail" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"thumbnail_url":"https://bucket.s3.us-east-1.amazonaws.com/thumbs/file-001.jpg"}'
@@ -334,7 +352,7 @@ Owner: D. Platform: AWS Lambda + API Gateway.
 Endpoint:
 
 ```http
-POST <AWS_Q5_URL>
+POST <A_API_GATEWAY_BASE_URL>/tags/modify
 Authorization: Bearer <token>
 Content-Type: application/json
 ```
@@ -373,7 +391,7 @@ Response:
 Curl:
 
 ```bash
-curl -X POST "$AWS_Q5_URL" \
+curl -X POST "$A_API_GATEWAY_BASE_URL/tags/modify" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"urls":["https://bucket.s3.us-east-1.amazonaws.com/originals/file-001.jpg"],"tags":{"wombat":2},"operation":"add"}'
@@ -386,7 +404,7 @@ Owner: D. Platform: AWS Lambda + API Gateway.
 Endpoint:
 
 ```http
-DELETE <AWS_Q6_URL>
+DELETE <A_API_GATEWAY_BASE_URL>/files
 Authorization: Bearer <token>
 Content-Type: application/json
 ```
@@ -433,7 +451,7 @@ Response:
 Curl:
 
 ```bash
-curl -X DELETE "$AWS_Q6_URL" \
+curl -X DELETE "$A_API_GATEWAY_BASE_URL/files" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"urls":["https://bucket.s3.us-east-1.amazonaws.com/originals/file-001.jpg"]}'
@@ -446,7 +464,7 @@ Owner: D. Platform: AWS Lambda + API Gateway + SNS.
 Endpoint:
 
 ```http
-POST <AWS_NOTIFICATION_URL>
+POST <A_API_GATEWAY_BASE_URL>/notifications/subscribe
 Authorization: Bearer <token>
 Content-Type: application/json
 ```
@@ -474,7 +492,7 @@ Unsubscribe:
 List subscriptions:
 
 ```http
-GET <AWS_NOTIFICATION_URL>?email=student@example.com
+GET <A_API_GATEWAY_BASE_URL>/notifications/subscribe?email=student@example.com
 Authorization: Bearer <token>
 ```
 
@@ -503,7 +521,7 @@ Publish helper for B:
 Curl:
 
 ```bash
-curl -X POST "$AWS_NOTIFICATION_URL" \
+curl -X POST "$A_API_GATEWAY_BASE_URL/notifications/subscribe" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"action":"subscribe","user_email":"student@example.com","species_list":["wombat"]}'
@@ -513,7 +531,7 @@ curl -X POST "$AWS_NOTIFICATION_URL" \
 
 1. Deploy DynamoDB tables from `Project/infra/dynamodb/template.yaml`.
 2. Deploy SNS topic from `Project/infra/sns/template.yaml`.
-3. Package `Project/lambda/shared` as a layer or copy it into Lambda packages.
+3. Package D Lambdas with `Project/scripts/package_d_lambdas.sh`, which copies `lambda/shared` into all five Lambda zip files.
 4. Deploy AWS Lambdas under `Project/lambda/queries-aws`.
 5. Ask A to connect API Gateway + Cognito Authorizer to Q3/Q4/Q5/Q6 and notification endpoints.
 6. Keep B's Oracle token private in Q4 Lambda environment variables.

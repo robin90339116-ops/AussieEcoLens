@@ -24,7 +24,7 @@ security:
   - CognitoAuthorizer: []
 
 paths:
-  /query/thumbnail:
+  /query/by-thumbnail:
     post:
       summary: Q3 thumbnail URL to original URL lookup
       security:
@@ -52,8 +52,8 @@ paths:
         "200":
           description: Matching files for inferred tags
 
-  /files/tags:
-    patch:
+  /tags/modify:
+    post:
       summary: Q5 batch add or remove tags
       security:
         - CognitoAuthorizer: []
@@ -68,7 +68,7 @@ paths:
         "207":
           description: Partial success with per-file errors
 
-  /files/delete:
+  /files:
     delete:
       summary: Q6 delete file from S3 and DynamoDB
       security:
@@ -82,7 +82,7 @@ paths:
         "200":
           description: Delete result
 
-  /notifications:
+  /notifications/subscribe:
     post:
       summary: Subscribe, unsubscribe, or publish notification events
       security:
@@ -95,3 +95,15 @@ paths:
       responses:
         "200":
           description: Notification action result
+    get:
+      summary: List notification subscriptions for the current user/email
+      security:
+        - CognitoAuthorizer: []
+      x-amazon-apigateway-integration:
+        type: aws_proxy
+        httpMethod: POST
+        payloadFormatVersion: "2.0"
+        uri: "arn:aws:apigateway:${AWS_REGION}:lambda:path/2015-03-31/functions/${NOTIFICATIONS_LAMBDA_ARN}/invocations"
+      responses:
+        "200":
+          description: Notification subscription list

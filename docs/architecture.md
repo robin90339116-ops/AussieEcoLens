@@ -23,6 +23,10 @@ flowchart LR
     Q5 --> DB
     Q6 --> DB
     Q6 --> S3["S3 original and thumbnail buckets"]
+    Q3 --> SignedUrl["Presigned GET media URLs"]
+    Q4 --> SignedUrl
+    GCPQ1 --> SignedUrl
+    GCPQ2 --> SignedUrl
 
     NotifyApi --> SNS["SNS topic"]
     SNS --> Email["Email subscribers"]
@@ -45,4 +49,7 @@ Key boundaries:
 - D AWS Lambdas are backend handlers behind A API Gateway and Cognito.
 - B Oracle token stays private and is used only by backend code.
 - GCP Q1/Q2 must verify Cognito JWTs when exposed directly.
+- Q1/Q2/Q3/Q4 return short-lived presigned GET URLs for private S3 media.
 - Query images for Q4 are not stored in S3 or DynamoDB.
+- Notification subscribe saves SNS `subscription_arn`; unsubscribe updates SNS
+  filter policy or calls SNS `unsubscribe`.
