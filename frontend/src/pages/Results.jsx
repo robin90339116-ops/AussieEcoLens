@@ -2,7 +2,7 @@ import { Button, Empty, Image as AntImage, Modal, Space, Tag, Typography, messag
 import { ExternalLink, Eye, Image as ImageIcon, PlayCircle } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useLocation } from 'react-router-dom';
-import { getErrorMessage, resolveOriginalUrl } from '../api/client';
+import { getErrorMessage, requestDownloadUrl } from '../api/client';
 
 const readStoredResults = () => {
   try {
@@ -27,23 +27,28 @@ export default function Results() {
   }, [location.state]);
 
   const handleOpenImage = async (item) => {
-    const thumbnailReference =
-      item.thumbnail_s3_key ||
-      item.thumbnail_storage_url ||
-      item.thumbnail_url ||
-      item.url ||
+    // Resolve the full-size image directly from the original storage reference
+    // via a fresh presigned GET URL. This avoids the fragile thumbnail-URL
+    // exact-match lookup (Q3), which 404s when the stored thumbnail_url differs
+    // from the displayed (presigned) one.
+    const originalReference =
+      item.original_s3_key ||
+      item.originalS3Key ||
       item.original_storage_url ||
-      item.original_url;
-    if (!thumbnailReference) {
+      item.original_url ||
+      item.url ||
+      item.thumbnail_storage_url ||
+      item.thumbnail_url;
+    if (!originalReference) {
       message.error('No preview URL is available for this result');
       return;
     }
-    setLoadingUrl(item.id || thumbnailReference);
+    setLoadingUrl(item.id || originalReference);
     try {
-      const originalUrl = await resolveOriginalUrl(thumbnailReference);
+      const originalUrl = await requestDownloadUrl(originalReference);
       setModalUrl(originalUrl);
     } catch (error) {
-      message.error(getErrorMessage(error, 'Could not resolve original URL'));
+      message.error(getErrorMessage(error, 'Could not load full-size image'));
     } finally {
       setLoadingUrl('');
     }

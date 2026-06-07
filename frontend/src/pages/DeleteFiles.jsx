@@ -1,4 +1,4 @@
-import { Button, Empty, Form, Input, Modal, Space, Table, Tag, Typography, message } from 'antd';
+import { Button, Empty, Form, Input, Modal, Space, Table, Typography, message } from 'antd';
 import { RefreshCw, Trash2 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { deleteFiles, getErrorMessage, listFiles, supportsFileListing } from '../api/client';
@@ -125,20 +125,7 @@ export default function DeleteFiles() {
                   </Typography.Text>
                 )
               },
-              { title: 'Type', dataIndex: 'type', width: 100 },
-              {
-                title: 'Tags',
-                dataIndex: 'tags',
-                render: (tags) => (
-                  <Space wrap>
-                    {Object.keys(tags || {}).map((tag) => (
-                      <Tag color="green" key={tag}>
-                        {tag}
-                      </Tag>
-                    ))}
-                  </Space>
-                )
-              }
+              { title: 'Type', dataIndex: 'type', width: 100 }
             ]}
           />
         ) : (
