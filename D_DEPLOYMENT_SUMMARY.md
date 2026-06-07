@@ -75,6 +75,9 @@ Use the same base URL with Cognito JWT:
 ## Still pending
 
 - GCP Q1/Q2 real deployment is not done on this machine because there is no `gcloud` CLI, Google login, project ID, or service account credentials available.
+  - Deployment script is ready: `scripts/deploy_gcp_q1_q2.sh`
+  - Validation script is ready: `scripts/check_gcp_q1_q2.sh`
+  - Required values: `GCP_PROJECT`, fresh `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_SESSION_TOKEN`
+  - Cognito defaults in the script: `COGNITO_USER_POOL_ID=us-east-1_lb6SisPnD`, `COGNITO_APP_CLIENT_ID=fvmq1uralbq80r9q7nrnonh73`
 - Q4 real Oracle tagging call is deployed but needs B to provide `ORACLE_TAG_UPLOAD_URL` and `ORACLE_API_TOKEN`, then update the Q4 Lambda environment.
 - AWS Academy credentials are temporary. If deployment or GCP DynamoDB access fails later, refresh the Lab credentials and update runtime environment variables.
-

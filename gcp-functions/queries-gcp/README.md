@@ -33,6 +33,29 @@ each demo or integration session because the session credentials expire.
 
 Deploy examples:
 
+Preferred script from the repository root:
+
+```bash
+export GCP_PROJECT=<project-id>
+export AWS_ACCESS_KEY_ID=<fresh AWS Academy key>
+export AWS_SECRET_ACCESS_KEY=<fresh AWS Academy secret>
+export AWS_SESSION_TOKEN=<fresh AWS Academy session token>
+
+./scripts/deploy_gcp_q1_q2.sh
+```
+
+After deployment, run:
+
+```bash
+export Q1_URL=<deployed q1 URL>
+export Q2_URL=<deployed q2 URL>
+export TOKEN=<valid Cognito JWT>
+
+./scripts/check_gcp_q1_q2.sh
+```
+
+Manual commands:
+
 ```bash
 gcloud functions deploy q1_query_by_tags \
   --gen2 \
