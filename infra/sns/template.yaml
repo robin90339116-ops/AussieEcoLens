@@ -1,0 +1,19 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: SNS notification topic for AussieEcoLens.
+
+Parameters:
+  TopicName:
+    Type: String
+    Default: AussieEcoLensSpeciesNotifications
+
+Resources:
+  SpeciesNotificationsTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Ref TopicName
+      DisplayName: AussieEcoLens wildlife notifications
+
+Outputs:
+  SpeciesNotificationsTopicArn:
+    Value: !Ref SpeciesNotificationsTopic
+

@@ -1,0 +1,109 @@
+openapi: 3.0.1
+info:
+  title: AussieEcoLens D Group API Gateway Fragment
+  version: "1.0"
+  description: >
+    Route fragment for attaching D group's AWS Lambda handlers to A's API
+    Gateway. Replace placeholders with A's deployed API Gateway, Cognito, and
+    Lambda ARNs before deployment.
+
+components:
+  securitySchemes:
+    CognitoAuthorizer:
+      type: oauth2
+      flows: {}
+      x-amazon-apigateway-authorizer:
+        type: jwt
+        identitySource: "$request.header.Authorization"
+        jwtConfiguration:
+          audience:
+            - "${COGNITO_APP_CLIENT_ID}"
+          issuer: "https://cognito-idp.${AWS_REGION}.amazonaws.com/${COGNITO_USER_POOL_ID}"
+
+security:
+  - CognitoAuthorizer: []
+
+paths:
+  /query/by-thumbnail:
+    post:
+      summary: Q3 thumbnail URL to original URL lookup
+      security:
+        - CognitoAuthorizer: []
+      x-amazon-apigateway-integration:
+        type: aws_proxy
+        httpMethod: POST
+        payloadFormatVersion: "2.0"
+        uri: "arn:aws:apigateway:${AWS_REGION}:lambda:path/2015-03-31/functions/${Q3_THUMBNAIL_LOOKUP_LAMBDA_ARN}/invocations"
+      responses:
+        "200":
+          description: Original media URL lookup result
+
+  /query/by-file:
+    post:
+      summary: Q4 temporary query file to tags, then matching files
+      security:
+        - CognitoAuthorizer: []
+      x-amazon-apigateway-integration:
+        type: aws_proxy
+        httpMethod: POST
+        payloadFormatVersion: "2.0"
+        uri: "arn:aws:apigateway:${AWS_REGION}:lambda:path/2015-03-31/functions/${Q4_IMAGE_SEARCH_LAMBDA_ARN}/invocations"
+      responses:
+        "200":
+          description: Matching files for inferred tags
+
+  /tags/modify:
+    post:
+      summary: Q5 batch add or remove tags
+      security:
+        - CognitoAuthorizer: []
+      x-amazon-apigateway-integration:
+        type: aws_proxy
+        httpMethod: POST
+        payloadFormatVersion: "2.0"
+        uri: "arn:aws:apigateway:${AWS_REGION}:lambda:path/2015-03-31/functions/${Q5_UPDATE_TAGS_LAMBDA_ARN}/invocations"
+      responses:
+        "200":
+          description: Tag update result
+        "207":
+          description: Partial success with per-file errors
+
+  /files:
+    delete:
+      summary: Q6 delete file from S3 and DynamoDB
+      security:
+        - CognitoAuthorizer: []
+      x-amazon-apigateway-integration:
+        type: aws_proxy
+        httpMethod: POST
+        payloadFormatVersion: "2.0"
+        uri: "arn:aws:apigateway:${AWS_REGION}:lambda:path/2015-03-31/functions/${Q6_DELETE_FILE_LAMBDA_ARN}/invocations"
+      responses:
+        "200":
+          description: Delete result
+
+  /notifications/subscribe:
+    post:
+      summary: Subscribe, unsubscribe, or publish notification events
+      security:
+        - CognitoAuthorizer: []
+      x-amazon-apigateway-integration:
+        type: aws_proxy
+        httpMethod: POST
+        payloadFormatVersion: "2.0"
+        uri: "arn:aws:apigateway:${AWS_REGION}:lambda:path/2015-03-31/functions/${NOTIFICATIONS_LAMBDA_ARN}/invocations"
+      responses:
+        "200":
+          description: Notification action result
+    get:
+      summary: List notification subscriptions for the current user/email
+      security:
+        - CognitoAuthorizer: []
+      x-amazon-apigateway-integration:
+        type: aws_proxy
+        httpMethod: POST
+        payloadFormatVersion: "2.0"
+        uri: "arn:aws:apigateway:${AWS_REGION}:lambda:path/2015-03-31/functions/${NOTIFICATIONS_LAMBDA_ARN}/invocations"
+      responses:
+        "200":
+          description: Notification subscription list
