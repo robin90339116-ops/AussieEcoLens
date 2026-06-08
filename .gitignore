@@ -1,10 +1,14 @@
 .DS_Store
+*.zip
 __pycache__/
-*.pyc
-*.pt
-.pytest_cache/
-.venv/
-dist/
 build/
-.aws-sam/
-.serverless/
+node_modules/
+dist/
+__MACOSX/
+frontend/.env
+frontend/.vite/
+
+# Large model artifacts from the ML handout are kept local and should not be
+# committed to the frontend repository.
+*.pt
+AussieEcoLense/
