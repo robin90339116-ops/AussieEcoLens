@@ -1,0 +1,14 @@
+# Verified working versions for the ML tagging Lambda container (Python 3.12, CPU).
+# Use opencv-python-headless (NOT opencv-python) to avoid the libGL.so.1 dependency.
+# onnx2torch is required because the SpeciesNet model.pt was exported via onnx2torch
+# and references its classes during unpickling.
+# onnx ships a prebuilt cp312 wheel, so no cmake/build toolchain is needed at install time.
+megadetector==10.0.21
+onnx2torch==1.5.15
+onnx==1.21.0
+torch==2.12.0
+torchvision==0.27.0
+Pillow==12.2.0
+opencv-python-headless==4.13.0.92
+numpy==2.4.4
+boto3

@@ -1,0 +1,216 @@
+[
+  {
+    "status": "ok",
+    "file_id": "3c5920c5c8ccc8d18be3dd4b84764b385bdef7226f12ae4ce0ef32b0b59d4a9a",
+    "file_type": "image",
+    "original_bucket": "aussie-ecolens-uploads",
+    "original_key": "uploads/Alectura_lathami_1.JPG",
+    "original_url": "https://aussie-ecolens-uploads.s3.amazonaws.com/uploads/Alectura_lathami_1.JPG",
+    "thumbnail_url": "https://aussie-ecolens-uploads.s3.amazonaws.com/thumbnails/Alectura_lathami_1.jpg",
+    "checksum": "a55dc44ee044c09230929b247b78992e7e9b833bc755f083e093db8b681f6854",
+    "tags": {
+      "australian brushturkey": 1
+    },
+    "predictions": [
+      {
+        "scientific_name": "Alectura_lathami",
+        "confidence": 0.9999760389328003,
+        "source": "Alectura_lathami_1-0",
+        "common_name": "australian brushturkey"
+      }
+    ],
+    "created_at": "2026-06-01T15:00:46Z",
+    "detections": 1
+  },
+  {
+    "status": "ok",
+    "file_id": "51ace6395822702daff7d24be6209597f4923e97d71614fe1377858fb0902e54",
+    "file_type": "image",
+    "original_bucket": "aussie-ecolens-uploads",
+    "original_key": "uploads/Felis_catus_1.JPG",
+    "original_url": "https://aussie-ecolens-uploads.s3.amazonaws.com/uploads/Felis_catus_1.JPG",
+    "thumbnail_url": "https://aussie-ecolens-uploads.s3.amazonaws.com/thumbnails/Felis_catus_1.jpg",
+    "checksum": "a32c1788fbbed64673c1d6b27be924b30952df905187ee4a9bdd162bc177dd68",
+    "tags": {
+      "domestic cat": 1
+    },
+    "predictions": [
+      {
+        "scientific_name": "Felis_catus",
+        "confidence": 0.9999996423721313,
+        "source": "Felis_catus_1-0",
+        "common_name": "domestic cat"
+      }
+    ],
+    "created_at": "2026-06-01T15:00:56Z",
+    "detections": 1
+  },
+  {
+    "status": "ok",
+    "file_id": "f596a98b033816eeed15acea3fbb738637f475b76f1bf45bcc793a092760dde9",
+    "file_type": "image",
+    "original_bucket": "aussie-ecolens-uploads",
+    "original_key": "uploads/Sus_scrofa_1.JPG",
+    "original_url": "https://aussie-ecolens-uploads.s3.amazonaws.com/uploads/Sus_scrofa_1.JPG",
+    "thumbnail_url": "https://aussie-ecolens-uploads.s3.amazonaws.com/thumbnails/Sus_scrofa_1.jpg",
+    "checksum": "a803bd4bc12235bb4e892a483ca3ffdc2b479c1c929c04ba10e5c9cecf80c906",
+    "tags": {
+      "wild boar": 1
+    },
+    "predictions": [
+      {
+        "scientific_name": "Sus_scrofa",
+        "confidence": 1.0,
+        "source": "Sus_scrofa_1-0",
+        "common_name": "wild boar"
+      }
+    ],
+    "created_at": "2026-06-01T15:01:08Z",
+    "detections": 1
+  },
+  {
+    "status": "ok",
+    "file_id": "e38bb038e9e361bc931098af6754f0b8b9b88833b26c1673f56fd2ca6a335cd4",
+    "file_type": "image",
+    "original_bucket": "aussie-ecolens-uploads",
+    "original_key": "uploads/Bos_taurus_1.JPG",
+    "original_url": "https://aussie-ecolens-uploads.s3.amazonaws.com/uploads/Bos_taurus_1.JPG",
+    "thumbnail_url": "https://aussie-ecolens-uploads.s3.amazonaws.com/thumbnails/Bos_taurus_1.jpg",
+    "checksum": "9f0f9f5cb5f0d51aa8c07540a1e9cbbf3100c3bd7ac9d2fe007af937c1dd2bf7",
+    "tags": {
+      "cattle": 6
+    },
+    "predictions": [
+      {
+        "scientific_name": "Bos_taurus",
+        "confidence": 0.9998528957366943,
+        "source": "Bos_taurus_1-0",
+        "common_name": "cattle"
+      },
+      {
+        "scientific_name": "Bos_taurus",
+        "confidence": 0.9997439980506897,
+        "source": "Bos_taurus_1-1",
+        "common_name": "cattle"
+      },
+      {
+        "scientific_name": "Bos_taurus",
+        "confidence": 0.9999998807907104,
+        "source": "Bos_taurus_1-2",
+        "common_name": "cattle"
+      },
+      {
+        "scientific_name": "Bos_taurus",
+        "confidence": 0.9971321821212769,
+        "source": "Bos_taurus_1-3",
+        "common_name": "cattle"
+      },
+      {
+        "scientific_name": "Bos_taurus",
+        "confidence": 0.9999221563339233,
+        "source": "Bos_taurus_1-4",
+        "common_name": "cattle"
+      },
+      {
+        "scientific_name": "Bos_taurus",
+        "confidence": 0.9999773502349854,
+        "source": "Bos_taurus_1-5",
+        "common_name": "cattle"
+      }
+    ],
+    "created_at": "2026-06-01T15:01:23Z",
+    "detections": 6
+  },
+  {
+    "status": "ok",
+    "file_id": "540e29cd851efb678fffa7db5f6c02ad2b77e650e0d9d5868dafd3674259905d",
+    "file_type": "image",
+    "original_bucket": "aussie-ecolens-uploads",
+    "original_key": "uploads/Canis_familiaris_1.JPG",
+    "original_url": "https://aussie-ecolens-uploads.s3.amazonaws.com/uploads/Canis_familiaris_1.JPG",
+    "thumbnail_url": "https://aussie-ecolens-uploads.s3.amazonaws.com/thumbnails/Canis_familiaris_1.jpg",
+    "checksum": "e0c529de81cd0963b78ff1c1fb895acbbde5231212bc49173606c85cda3d2d4b",
+    "tags": {
+      "dingo": 1
+    },
+    "predictions": [
+      {
+        "scientific_name": "Canis_familiaris",
+        "confidence": 0.9999955892562866,
+        "source": "Canis_familiaris_1-0",
+        "common_name": "dingo"
+      }
+    ],
+    "created_at": "2026-06-01T15:01:35Z",
+    "detections": 1
+  },
+  {
+    "status": "ok",
+    "file_id": "23705b226e01f708ff6c85448c03185998c0326b945c6aa70a1c5f062ff863a5",
+    "file_type": "image",
+    "original_bucket": "aussie-ecolens-uploads",
+    "original_key": "uploads/Casuarius_casuarius_1.JPG",
+    "original_url": "https://aussie-ecolens-uploads.s3.amazonaws.com/uploads/Casuarius_casuarius_1.JPG",
+    "thumbnail_url": "https://aussie-ecolens-uploads.s3.amazonaws.com/thumbnails/Casuarius_casuarius_1.jpg",
+    "checksum": "3317f3ac49cf7b82945d83dd6fa4b495b7b9371d267c946f3c8b5cd1dfd6d446",
+    "tags": {
+      "southern cassowary": 1
+    },
+    "predictions": [
+      {
+        "scientific_name": "Casuarius_casuarius",
+        "confidence": 1.0,
+        "source": "Casuarius_casuarius_1-0",
+        "common_name": "southern cassowary"
+      }
+    ],
+    "created_at": "2026-06-01T15:01:45Z",
+    "detections": 1
+  },
+  {
+    "status": "ok",
+    "file_id": "fc4711c69194f2528a8457aa66e0015c54df4c48763b6c797fcca90965c835fd",
+    "file_type": "image",
+    "original_bucket": "aussie-ecolens-uploads",
+    "original_key": "uploads/Thylogale_stigmatica_1.JPG",
+    "original_url": "https://aussie-ecolens-uploads.s3.amazonaws.com/uploads/Thylogale_stigmatica_1.JPG",
+    "thumbnail_url": "https://aussie-ecolens-uploads.s3.amazonaws.com/thumbnails/Thylogale_stigmatica_1.jpg",
+    "checksum": "cef6aeb6d60e32ccc1300c09483db35e98ea63a77817397212480a97c7301435",
+    "tags": {
+      "red-legged pademelon": 1
+    },
+    "predictions": [
+      {
+        "scientific_name": "Thylogale_stigmatica",
+        "confidence": 0.9999326467514038,
+        "source": "Thylogale_stigmatica_1-0",
+        "common_name": "red-legged pademelon"
+      }
+    ],
+    "created_at": "2026-06-01T15:01:56Z",
+    "detections": 1
+  },
+  {
+    "status": "ok",
+    "file_id": "7d1a6ecc1de5594b84c58b721ce727a5a4db6a04b6190bfb73fe50cda1d9da94",
+    "file_type": "image",
+    "original_bucket": "aussie-ecolens-uploads",
+    "original_key": "uploads/Uromys_caudimaculatus_1.JPG",
+    "original_url": "https://aussie-ecolens-uploads.s3.amazonaws.com/uploads/Uromys_caudimaculatus_1.JPG",
+    "thumbnail_url": "https://aussie-ecolens-uploads.s3.amazonaws.com/thumbnails/Uromys_caudimaculatus_1.jpg",
+    "checksum": "df47bb6d18e5a2c84f69504aa0183d6e0563dc1ca69441f21df57d9baada2fa3",
+    "tags": {
+      "giant white-tailed rat": 1
+    },
+    "predictions": [
+      {
+        "scientific_name": "Uromys_caudimaculatus",
+        "confidence": 0.9917894601821899,
+        "source": "Uromys_caudimaculatus_1-0",
+        "common_name": "giant white-tailed rat"
+      }
+    ],
+    "created_at": "2026-06-01T15:02:06Z",
+    "detections": 1
+  }
+]

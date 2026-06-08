@@ -1,0 +1,6 @@
+# Web service layer for the Oracle/OCI ML inference deployment (Route B).
+# Install together with the ML dependencies in requirements-lambda.txt.
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+python-multipart==0.0.20
+gunicorn==23.0.0

@@ -1,0 +1,26 @@
+# systemd unit to auto-start the ML service container on the Oracle (OCI) instance.
+# Install:
+#   sudo cp aussie-ecolens-ml.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now aussie-ecolens-ml.service
+#
+# Requires Docker + the docker compose plugin, and a .env file next to docker-compose.yml
+# containing API_AUTH_TOKEN (and optionally METADATA_API_URL).
+
+[Unit]
+Description=Aussie EcoLens ML inference service (OCI)
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/ubuntu/fit5225/ass2/AussieEcoLense
+ExecStartPre=/usr/bin/docker compose build
+ExecStart=/usr/bin/docker compose up
+ExecStop=/usr/bin/docker compose down
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

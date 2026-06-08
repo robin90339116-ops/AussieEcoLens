@@ -1,0 +1,15 @@
+.venv/
+__pycache__/
+*.pyc
+.DS_Store
+batch_output/
+local_test_output/
+_mlrun_*/
+_warm_*/
+_edge/
+.env
+
+# Large model files: share via release/storage, not git history.
+# Remove the next two lines if your team intends to commit the models.
+mdv5a.pt
+model.pt
