@@ -112,13 +112,11 @@ def _scan_all() -> list[dict[str, Any]]:
     return items
 
 
-def query_by_tag_counts(required_tags: dict[str, Any], *, owner_id: str | None = None, limit: int = 100) -> list[dict[str, Any]]:
+def query_by_tag_counts(required_tags: dict[str, Any], *, limit: int = 100) -> list[dict[str, Any]]:
     required = normalise_tags(required_tags)
     matches: list[dict[str, Any]] = []
 
     for item in _scan_all():
-        if owner_id and item.get("owner_id") != owner_id:
-            continue
         tags = normalise_tags(item.get("tags", {}))
         if all(tags.get(species, Decimal(0)) >= count for species, count in required.items()):
             matches.append(attach_presigned_media_urls(item))
@@ -128,13 +126,11 @@ def query_by_tag_counts(required_tags: dict[str, Any], *, owner_id: str | None =
     return matches
 
 
-def query_by_species(species: str, *, owner_id: str | None = None, limit: int = 100) -> list[dict[str, Any]]:
+def query_by_species(species: str, *, limit: int = 100) -> list[dict[str, Any]]:
     species_key = normalise_species(species)
     matches: list[dict[str, Any]] = []
 
     for item in _scan_all():
-        if owner_id and item.get("owner_id") != owner_id:
-            continue
         tags = normalise_tags(item.get("tags", {}))
         if tags.get(species_key, Decimal(0)) > 0:
             matches.append(attach_presigned_media_urls(item))

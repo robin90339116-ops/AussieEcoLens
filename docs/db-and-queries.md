@@ -25,6 +25,9 @@ For the formal frontend demo, use A's API Gateway as the main public backend ent
 
 This repo already includes the GCP JWT verification middleware for Q1/Q2. Keep `AUTH_REQUIRED=true` outside local smoke tests.
 
+Q1 and Q2 use Cognito JWT only to block unauthenticated users. They query the
+shared database and intentionally do not filter by `owner_id`.
+
 ## Environment
 
 Common AWS environment variables:
@@ -161,6 +164,9 @@ Content-Type: application/json
 
 Preferred demo route: A API Gateway. Direct GCP route is acceptable only when `AUTH_REQUIRED=true` and Cognito JWT settings are configured.
 
+Authentication is required, but Q1 is a shared-library query. It returns all
+matching records in DynamoDB rather than only the caller's uploads.
+
 Request:
 
 ```json
@@ -222,6 +228,9 @@ Content-Type: application/json
 ```
 
 Preferred demo route: A API Gateway. Direct GCP route is acceptable only when `AUTH_REQUIRED=true` and Cognito JWT settings are configured.
+
+Authentication is required, but Q2 is a shared-library query. It returns all
+matching records in DynamoDB rather than only the caller's uploads.
 
 Request:
 

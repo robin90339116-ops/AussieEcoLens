@@ -13,6 +13,10 @@ Functions:
 - `q1_query_by_tags`: Q1 AND query by species counts.
 - `q2_query_by_species`: Q2 query by species existence.
 
+Q1 and Q2 require a valid Cognito JWT for authentication, but they search the
+shared media database. They do not filter results by Cognito `sub`, email, or
+request `owner_id`.
+
 Required environment variables:
 
 - `AWS_REGION`: AWS DynamoDB region, default `us-east-1`.

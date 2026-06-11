@@ -39,8 +39,8 @@ def main() -> None:
     q1 = db_access.query_by_tag_counts({"wombat": 2, "magpie": 1})
     assert [item["file_id"] for item in q1] == ["a"], q1
 
-    q1_owner = db_access.query_by_tag_counts({"wombat": 2}, owner_id="user-1")
-    assert [item["file_id"] for item in q1_owner] == ["a", "b"], q1_owner
+    q1_all = db_access.query_by_tag_counts({"wombat": 2})
+    assert [item["file_id"] for item in q1_all] == ["a", "b"], q1_all
 
     q2 = db_access.query_by_species("magpie")
     assert [item["file_id"] for item in q2] == ["a", "c"], q2

@@ -78,10 +78,10 @@ These methods and body shapes were read from `origin/Lianjun-Zhang`:
   set `VITE_UPLOAD_STATUS_PATH`; otherwise the frontend reports recognition as queued.
 - Q1 tag count query: D's deployed GCP handler is
   `https://australia-southeast1-project-e8ee6cc2-5c7b-44f3-aeb.cloudfunctions.net/q1_query_by_tags`;
-  it expects `POST` JSON `{ tags: { species: count }, limit }`, verifies Cognito JWTs, filters by the logged-in user, and returns `items`.
+  it expects `POST` JSON `{ tags: { species: count }, limit }`, verifies Cognito JWTs, searches the shared database, and returns `items`.
 - Q2 species query: D's deployed GCP handler is
   `https://australia-southeast1-project-e8ee6cc2-5c7b-44f3-aeb.cloudfunctions.net/q2_query_by_species`;
-  it expects `POST` JSON `{ species, limit }`, verifies Cognito JWTs, filters by the logged-in user, and returns `items`.
+  it expects `POST` JSON `{ species, limit }`, verifies Cognito JWTs, searches the shared database, and returns `items`.
 - Q3 thumbnail lookup: D's AWS Lambda expects `POST` JSON `{ thumbnail_url }` and returns `original_url`, `thumbnail_url`, `tags`, and `type`.
 - Q4 uploaded-file query: D's AWS Lambda expects `POST` JSON
   `{ image_base64, filename, content_type, limit }` or `{ image_url, limit }`;
@@ -92,8 +92,7 @@ These methods and body shapes were read from `origin/Lianjun-Zhang`:
 - File listing: D's branch does not include a GET list endpoint. The frontend leaves `VITE_LIST_FILES_PATH` empty unless A/D add one.
 - Subscriptions: D's AWS Lambda supports `GET ?email=<user>` for listing and `POST` actions for subscribe/unsubscribe.
   A must attach both GET and POST methods to the agreed API Gateway path.
-- Path coordination: A pre-created `/notifications/subscribe`, while D's latest OpenAPI fragment uses `/notifications`.
-  The frontend currently targets A's `/notifications/subscribe`; A and D must deploy one agreed path before the demo.
+- Path coordination: A and D now use the agreed `/notifications/subscribe` path for subscription list, subscribe and unsubscribe.
 
 ## Demo Smoke Test
 
@@ -105,8 +104,9 @@ These methods and body shapes were read from `origin/Lianjun-Zhang`:
 6. Upload one image and verify progress and the uploaded-image preview. If no status
    endpoint is deployed, confirm the page says `Recognition queued`; otherwise also
    verify the generated thumbnail and tags.
-7. Run Q1 with two species/count rows and confirm AND semantics. Use the same login
-   account that uploaded the test image, because D's GCP queries filter by Cognito user.
+7. Run Q1 with two species/count rows and confirm AND semantics. The request must
+   include a Cognito JWT, but matching files are returned from the shared database,
+   not only from the current user's uploads.
 8. Run Q2 for one species and confirm the browser Network request goes to the
    `cloudfunctions.net` domain with an `Authorization: Bearer ...` header.
 9. Run Q4 with a query image and confirm the query image is not stored.

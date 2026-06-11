@@ -74,7 +74,8 @@ The API client accepts common response shapes used during integration:
 
 All authenticated API calls attach `Authorization: Bearer <token>` using Amplify's current Cognito session.
 Q1/Q2 requests therefore carry the same Cognito JWT to GCP, where D's functions verify
-the token and filter results by the logged-in user.
+the token. The token is used for authentication only; Q1/Q2 return matching records
+from the shared DynamoDB database rather than filtering by the logged-in user.
 
 The S3-triggered thumbnail, ML, and database pipeline is asynchronous. Until the team
 provides an upload-status endpoint, the upload page previews an uploaded image through a
