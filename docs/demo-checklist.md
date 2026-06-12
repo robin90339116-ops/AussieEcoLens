@@ -32,8 +32,6 @@ Preferred formal demo route:
 | Notifications | A API Gateway `/notifications/subscribe` | AWS Lambda `notifications` and SNS |
 
 Q1/Q2 can be direct GCP HTTPS only when Cognito JWT verification is enabled.
-Q1/Q2 use JWT for authentication only and return matching records from the
-shared database, not only from the current user's uploads.
 B's Oracle token is never exposed to the frontend.
 
 ## Smoke-test sequence

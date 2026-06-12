@@ -48,6 +48,13 @@ def _request_json(request: Request) -> dict[str, Any]:
     return data if isinstance(data, dict) else {}
 
 
+def _owner_id(request: Request, body: dict[str, Any]) -> str | None:
+    if body.get("owner_id"):
+        return body["owner_id"]
+    claims = getattr(request, "user_claims", {}) or {}
+    return claims.get("sub") or claims.get("email")
+
+
 @functions_framework.http
 @with_cognito_auth
 def q1_query_by_tags(request: Request):
@@ -64,9 +71,7 @@ def q1_query_by_tags(request: Request):
     except (TypeError, ValueError):
         return _json_response({"error": "limit must be an integer"}, 400, request)
 
-    # Authentication is required, but Q1 searches the shared wildlife database.
-    # Do not filter by Cognito user; the assignment expects all matching files.
-    items = query_by_tag_counts(tags, limit=limit)
+    items = query_by_tag_counts(tags, owner_id=_owner_id(request, body), limit=limit)
     return _json_response(
         {
             "query_type": "Q1_AND_TAG_COUNTS",
@@ -94,9 +99,7 @@ def q2_query_by_species(request: Request):
     except (TypeError, ValueError):
         return _json_response({"error": "limit must be an integer"}, 400, request)
 
-    # Authentication is required, but Q2 searches the shared wildlife database.
-    # Do not filter by Cognito user; the assignment expects all matching files.
-    items = query_by_species(species, limit=limit)
+    items = query_by_species(species, owner_id=_owner_id(request, body), limit=limit)
     return _json_response(
         {
             "query_type": "Q2_SPECIES_EXISTS",
